@@ -36,22 +36,20 @@ let consoleBefore = (Console.ForegroundColor, Console.BackgroundColor)
 let AltCoverFilter(p : Primitive.PrepareOptions) =
   { p with
       MethodFilter = "WaitForExitCustom" :: (p.MethodFilter |> Seq.toList)
-      AssemblyExcludeFilter = "Tests" :: (p.AssemblyExcludeFilter |> Seq.toList)
       AssemblyFilter = [ @"\.DataCollector"; "Sample" ] @ (p.AssemblyFilter |> Seq.toList)
       LocalSource = true
       TypeFilter =
-        [ @"System\."; @"Sample3\.Class2"; "Microsoft"; "ICSharpCode" ] @ (p.TypeFilter |> Seq.toList) }
+        [ @"System\."; @"Sample3\.Class2"; "Microsoft"; "ICSharpCode"; "UnitTestStub" ] @ (p.TypeFilter |> Seq.toList) }
 
 let AltCoverFilterTypeSafe(p : TypeSafe.PrepareOptions) =
   { p with
       MethodFilter = [TypeSafe.Raw "WaitForExitCustom"] |>  p.MethodFilter.Join
-      AssemblyExcludeFilter = [ TypeSafe.Raw "Tests"] |> p.AssemblyExcludeFilter.Join
       AssemblyFilter = [ @"\.DataCollector"; "Sample" ]
                        |> Seq.map TypeSafe.Raw
                        |> p.AssemblyFilter.Join
       LocalSource = TypeSafe.Set
       TypeFilter =
-        [ @"System\."; @"Sample3\.Class2"; "Microsoft"; "ICSharpCode" ]
+        [ @"System\."; @"Sample3\.Class2"; "Microsoft"; "ICSharpCode"; "UnitTestStub" ]
         |> Seq.map TypeSafe.Raw
         |> p.TypeFilter.Join }
 
@@ -61,28 +59,26 @@ let AltCoverApiFilter(p : Primitive.PrepareOptions) =
       AssemblyFilter = [ "?^AltCover\." ] @ (p.AssemblyFilter |> Seq.toList)
       LocalSource = true
       TypeFilter =
-        [ @"System\."; @"Sample3\.Class2"; "Microsoft"; "ICSharpCode"; "<Start" ] @ (p.TypeFilter |> Seq.toList) }
+        [ @"System\."; @"Sample3\.Class2"; "Microsoft"; "ICSharpCode"; "<Start"; "UnitTestStub" ] @ (p.TypeFilter |> Seq.toList) }
 
 let AltCoverFilterX(p : Primitive.PrepareOptions) =
   { p with
       MethodFilter = "WaitForExitCustom" :: (p.MethodFilter |> Seq.toList)
-      AssemblyExcludeFilter = "Tests" :: (p.AssemblyExcludeFilter |> Seq.toList)
       AssemblyFilter = [ @"\.DataCollector"; "Sample" ] @ (p.AssemblyFilter |> Seq.toList)
       LocalSource = true
       TypeFilter =
-        [ @"System\."; @"Sample3\.Class2"; "Tests"; "Microsoft"; "ICSharpCode"; "<Start"]
+        [ @"System\."; @"Sample3\.Class2"; "Microsoft"; "ICSharpCode"; "<Start"; "UnitTestStub"]
         @ (p.TypeFilter |> Seq.toList) }
 
 let AltCoverFilterXTypeSafe(p : TypeSafe.PrepareOptions) =
   { p with
       MethodFilter = [TypeSafe.Raw "WaitForExitCustom"] |>  p.MethodFilter.Join
-      AssemblyExcludeFilter = [ TypeSafe.Raw "Tests"] |> p.AssemblyExcludeFilter.Join
       AssemblyFilter = [ @"\.DataCollector"; "Sample" ]
                        |> Seq.map TypeSafe.Raw
                        |> p.AssemblyFilter.Join
       LocalSource = TypeSafe.Set
       TypeFilter =
-        [ @"System\."; @"Sample3\.Class2"; "Tests"; "Microsoft"; "ICSharpCode" ]
+        [ @"System\."; @"Sample3\.Class2"; "Microsoft"; "ICSharpCode"; "UnitTestStub" ]
         |> Seq.map TypeSafe.Raw
         |> p.TypeFilter.Join }
 
@@ -272,6 +268,8 @@ let uncovered (path : string) =
                   (f
                    |> Path.GetDirectoryName
                    |> Path.GetFileName) numeric
+                // if numeric > 0 then
+                //   printfn "%A" xml
                 numeric))
   |> Seq.toList
 
@@ -744,7 +742,17 @@ _Target "FxCop" (fun _ ->
     reraise())
 // Unit Test
 
-_Target "UnitTest" coverageSummary
+_Target "UnitTest" (fun _ ->
+
+  printfn "Dump uncovered lines"
+  CreateProcess.fromRawCommand pwsh [ "-NoProfile"; "./Build/dump-uncovered.ps1" ]
+  |> CreateProcess.withWorkingDirectory "."
+  |> Proc.run
+  |> (Actions.AssertResult "pwsh")
+
+  coverageSummary())
+
+
 _Target "UncoveredUnitTest" ignore
 
 _Target "JustUnitTest" (fun _ ->
@@ -873,10 +881,10 @@ _Target "UnitTestDotNetWithCoverlet" (fun _ ->
 _Target "UnitTestWithOpenCover" (fun _ ->
   Directory.ensure "./_Reports/_UnitTestWithOpenCover"
   let testFiles = "./_Binaries/AltCover.ValidateGendarmeEmulation/Debug+AnyCPU/net472/AltCover.ValidateGendarmeEmulation.dll" ::
-                  (!!(@"_Binaries/*Test*/Debug+AnyCPU/net4*/AltCover*Test*.dll")
+                  (!!(@"_Binaries/*Test*/Debug+AnyCPU/net472/AltCover*Test*.dll")
                    |> Seq.filter (fun f -> Path.GetFileName(f) <> "AltCover.Fake.DotNet.Testing.AltCover.dll")
                    |> Seq.filter (fun f -> Path.GetFileName(f) <> "AltCover.Recorder.Tests.dll")
-                   |> Seq.filter (fun s -> s.Contains("Visualizer") |> not) // incomplete
+                   |> Seq.filter (fun f -> Path.GetFileName(f) <> "AltCover.Tests.Visualizer.dll")
                    |> Seq.toList)
 
   let Recorder4Files = !!(@"_Binaries/*Tests/Debug+AnyCPU/net472/*Recorder.Tests.dll")
@@ -893,7 +901,7 @@ _Target "UnitTestWithOpenCover" (fun _ ->
           ExePath = openCoverConsole
           TestRunnerExePath = nunitConsole
           Filter =
-            "+[AltCover]* +[AltCover.Recorder]* +[AltCover.Engine]* +[AltCover.ValidateGendarmeEmulation]Alt* +[AltCover.Toolkit]* +[AltCover.DotNet]* -[*]AltCover.Tests.* -[*]AltCover.SolutionRoot -[*]Microsoft.* -[*]System.* -[Sample*]* -[*]ICSharpCode.*"
+            "+[AltCover]* +[AltCover.*]* -[*]Microsoft.* -[*]System.* -[Sample*]* -[*]ICSharpCode.* -[FSharp.Core]* -[Gendarme.*]* -[xunit.*]*"
           MergeByHash = true
           ReturnTargetCode = Fake.DotNet.Testing.OpenCover.ReturnTargetCodeType.Yes
           OptionalArguments =
@@ -910,7 +918,7 @@ _Target "UnitTestWithOpenCover" (fun _ ->
           ExePath = openCoverConsole
           TestRunnerExePath = nunitConsole
           Filter =
-            "+[AltCover.Recorder]* -[*]ICSharpCode.* -[*]System.*"
+            "+[AltCover.Recorder]* +[AltCover.Recorder.Tests]* -[*]ICSharpCode.* -[*]System.*"
           MergeByHash = true
           ReturnTargetCode = Fake.DotNet.Testing.OpenCover.ReturnTargetCodeType.Yes
           OptionalArguments =
@@ -926,7 +934,7 @@ _Target "UnitTestWithOpenCover" (fun _ ->
           ExePath = openCoverConsole
           TestRunnerExePath = nunitConsole
           Filter =
-            "+[AltCover.Recorder]* -[*]ICSharpCode.* -[*]System.*"
+            "+[AltCover.Recorder]* +[AltCover.Recorder.Tests]* -[*]ICSharpCode.* -[*]System.*"
           MergeByHash = true
           ReturnTargetCode = Fake.DotNet.Testing.OpenCover.ReturnTargetCodeType.Yes
           OptionalArguments =
@@ -1067,6 +1075,9 @@ _Target "UnitTestWithAltCoverRunner" (fun _ ->
   let reports = Path.getFullName "./_Reports"
   let altcover = Path.getFullName "./_Binaries/AltCover/Release+AnyCPU/net472/AltCover.exe"
 
+  // Only use
+  let baseFilter = AltCoverFilterTypeSafe
+
   let tests =
     [
       (
@@ -1078,7 +1089,7 @@ _Target "UnitTestWithAltCoverRunner" (fun _ ->
             "_Binaries/AltCover.Tests/Debug+AnyCPU/net472/__UnitTestWithAltCoverRunner/AltCover.Tests.dll"
           Path.getFullName
             "_Binaries/AltCover.Tests/Debug+AnyCPU/net472/__UnitTestWithAltCoverRunner/Sample2.dll" ],
-        AltCoverFilterTypeSafe,
+        baseFilter,
         keyfile
       )
       (
@@ -1088,7 +1099,7 @@ _Target "UnitTestWithAltCoverRunner" (fun _ ->
         "./_Reports/ApiTestWithAltCoverRunnerReport.xml", // relative nunit reporting
         [ Path.getFullName // test assemblies
             "_Binaries/AltCover.Api.Tests/Debug+AnyCPU/net472/__ApiTestWithAltCoverRunner/AltCover.Api.Tests.dll" ],
-        AltCoverFilterTypeSafe,
+        baseFilter,
         keyfile
       )
       (
@@ -1098,8 +1109,11 @@ _Target "UnitTestWithAltCoverRunner" (fun _ ->
         "./_Reports/ValidateGendarmeEmulationWithAltCoverRunnerReport.xml",
         [ Path.getFullName
             "_Binaries/AltCover.ValidateGendarmeEmulation/Debug+AnyCPU/net472/__ValidateGendarmeEmulationWithAltCoverRunner/AltCover.ValidateGendarmeEmulation.dll" ],
-        (fun x -> { x with TypeFilter = TypeSafe.Filters [ TypeSafe.Raw "Tests"; TypeSafe.Raw "SolutionRoot" ]}) >> AltCoverFilterXTypeSafe,
-        keyfile
+        // only use // (* >> (fun x ->  { x with AssemblyExcludeFilter = TypeSafe.Filters [] }) *),
+        (fun x -> { x with TypeFilter =
+                             TypeSafe.Filters [ TypeSafe.Raw "SolutionRoot" ]}) >>
+                             AltCoverFilterXTypeSafe,
+                             keyfile
       )
       (
         Path.getFullName "_Binaries/AltCover.Recorder.Tests/Debug+AnyCPU/net472",
@@ -1108,7 +1122,7 @@ _Target "UnitTestWithAltCoverRunner" (fun _ ->
         "./_Reports/RecorderTestWithAltCoverRunnerReport.xml",
         [ Path.getFullName
             "_Binaries/AltCover.Recorder.Tests/Debug+AnyCPU/net472/__RecorderTestWithAltCoverRunner/AltCover.Recorder.Tests.dll" ],
-        AltCoverFilterTypeSafe,
+        baseFilter,
         shadowkeyfile
       )
       (
@@ -1118,19 +1132,10 @@ _Target "UnitTestWithAltCoverRunner" (fun _ ->
         "./_Reports/RecorderTest2WithAltCoverRunnerReport.xml",
         [ Path.getFullName
             "_Binaries/AltCover.Recorder.Tests/Debug+AnyCPU/net20/__RecorderTest2WithAltCoverRunner/AltCover.Recorder.Tests.dll" ],
-        AltCoverFilterTypeSafe,
+        baseFilter >> (fun p -> { p with AttributeFilter =
+                                           [TypeSafe.Raw "EntryPoint"]
+                                           |> p.AttributeFilter.Join}),
         shadowkeyfile
-      )
-      (
-        Path.getFullName "_Binaries/AltCover.Tests.Visualizer/Debug+AnyCPU/net472",
-        "./__GTKVTestWithAltCoverRunner",
-        "GTKVTestWithAltCoverRunner.xml",
-        "./_Reports/GTKVTestWithAltCoverRunnerReport.xml",
-        [ Path.getFullName
-            "_Binaries/AltCover.Tests.Visualizer/Debug+AnyCPU/net472/__GTKVTestWithAltCoverRunner/AltCover.Tests.Visualizer.dll" ],
-        (fun x -> { x with TypeFilter = TypeSafe.Filters [ TypeSafe.Raw "Gui" ]
-                           AssemblyFilter = TypeSafe.Filters [ TypeSafe.Raw "\\-sharp" ]}) >> AltCoverFilterTypeSafe,
-        keyfile
       )
     ]
 
@@ -1187,8 +1192,7 @@ _Target "UnitTestWithAltCoverRunner" (fun _ ->
 
   let xmlreports =
     pester :: (tests
-               |> List.map (fun (_, _, report, _, _, _, _) -> reports @@ report)
-               |> List.filter (fun f -> f.Contains("GTKV") |> not))
+               |> List.map (fun (_, _, report, _, _, _, _) -> reports @@ report))
 
   ReportGenerator.generateReports (fun p ->
     { p with
@@ -1367,7 +1371,7 @@ _Target "UnitTestWithAltCoverCoreRunner" (fun _ ->
            ({ Primitive.PrepareOptions.Create() with
                 XmlReport = report
                 OutputDirectories = [| output |]
-                TypeFilter = [ "SolutionRoot"; "Expecto"; "Tests" ]
+                TypeFilter = [ "SolutionRoot"; "Expecto" ]
                 VisibleBranches = true
                 StrongNameKey = keyfile
                 SingleVisit = true
@@ -2417,7 +2421,7 @@ _Target "Packaging" (fun _ ->
        Directory.ensure workingDir
        Directory.ensure outputPath
 
-       NuGet (fun p ->
+       NuGetPack (fun p ->
          { p with
              Authors = [ "Steve Gilham" ]
              Project = project
@@ -4149,10 +4153,16 @@ Target.activateFinal "ResetConsoleColours"
 
 "Compilation"
 ==> "UnitTestWithOpenCover"
+//=?> ("UnitTestWithOpenCover",
+//     (!!(@"_Binaries/*Test*/Debug+AnyCPU/net4*/AltCover*Test*.dll")
+//     |> Seq.length) < 6)
 =?> ("UnitTest", Environment.isWindows)  // OpenCover Mono support
 
 "Compilation"
 ==> "UnitTestWithAltCover"
+//=?> ("UnitTestWithAltCover",
+//     (!!(@"_Binaries/*Test*/Debug+AnyCPU/net4*/AltCover*Test*.dll")
+//     |> Seq.length) < 6)
 ==> "UnitTest"
 
 "Compilation"

@@ -45,11 +45,7 @@ module Augment =
                     Justification = "Idiomatic F# style")>]
   let Left x : Either<'a, 'b> = Choice2Of2 x
 
-#if !GUI
   let internal (|Right|Left|) =
-#else
-  let (|Right|Left|) =
-#endif
     function
     | Choice1Of2 x -> Right x
     | Choice2Of2 x -> Left x

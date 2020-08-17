@@ -1,21 +1,10 @@
-namespace AltCover.Tests
+namespace Tests
 
 open System
 open System.IO
-open System.Reflection
 
 open AltCover
 open Mono.Cecil
-open Swensen.Unquote
-
-#if NETCOREAPP3_0
-[<AttributeUsage(AttributeTargets.Method)>]
-type TestAttribute() = class
-    inherit Attribute()
-end
-#else
-type TestAttribute = NUnit.Framework.TestAttribute
-#endif
 
 module Rocks =
   let rec GetAllTypes(t : TypeDefinition) =
@@ -25,6 +14,23 @@ module Rocks =
              |> Seq.toList))
 
 module ValidateGendarmeEmulation =
+  let importantItems (n, e, r) =
+    maybe (r <> e) (Some(n, e, r)) None
+
+  let stringify x =
+    match x with
+    | Some (n, e, r) -> Some (sprintf "Expected %d got %d in %s" e r n)
+    | None -> None
+
+  let seqStringify x =
+    x |> Seq.map stringify
+
+  [<Test>]
+  let DoSelfTest () =
+    test <@ importantItems (1, 2, 3) = Some (1, 2, 3) @>
+    test <@ importantItems (1, 1, 1) |> Option.isNone @>
+    test <@ Some ("1", 2, 3) |> stringify = Some "Expected 2 got 3 in 1" @>
+    test <@ None |> stringify |> Option.isNone @>
 
   [<Test>]
   let ShouldMatchGendarmeComplexityInAltCover() =
@@ -41,7 +47,7 @@ module ValidateGendarmeEmulation =
             Gendarme.Rules.Maintainability.AvoidComplexMethodsRule.GetCyclomaticComplexity
               m, Gendarme.cyclomaticComplexity m))
           >> (fun (n, e, r) ->
-          if r <> e then Some(n, e, r) else None))
+          importantItems(n, e, r)))
           (def.MainModule.Types
           |> Seq.cast<TypeDefinition>
           |> Seq.map Rocks.GetAllTypes
@@ -49,10 +55,8 @@ module ValidateGendarmeEmulation =
           |> List.map (fun t -> t.Methods |> Seq.cast<MethodDefinition>)
           |> Seq.concat
           |> Seq.sortBy (fun m -> m.FullName)))
-      |> Seq.filter Option.isSome
-      |> Seq.map (fun x ->
-            let n, e, r = Option.get x
-            sprintf "Expected %d got %d in %s" e r n)
+      |> seqStringify
+      |> Seq.choose id
       |> Seq.toList
     test <@ List.isEmpty failures @>
 
@@ -71,7 +75,7 @@ module ValidateGendarmeEmulation =
             Gendarme.Rules.Maintainability.AvoidComplexMethodsRule.GetCyclomaticComplexity
               m, Gendarme.cyclomaticComplexity m))
           >> (fun (n, e, r) ->
-          if r <> e then Some(n, e, r) else None))
+          importantItems(n, e, r)))
           (def.MainModule.Types
           |> Seq.cast<TypeDefinition>
           |> Seq.map Rocks.GetAllTypes
@@ -79,10 +83,8 @@ module ValidateGendarmeEmulation =
           |> List.map (fun t -> t.Methods |> Seq.cast<MethodDefinition>)
           |> Seq.concat
           |> Seq.sortBy (fun m -> m.FullName)))
-      |> Seq.filter Option.isSome
-      |> Seq.map (fun x ->
-            let n, e, r = Option.get x
-            sprintf "Expected %d got %d in %s" e r n)
+      |> seqStringify
+      |> Seq.choose id
       |> Seq.toList
     test <@ List.isEmpty failures @>
 
@@ -102,7 +104,7 @@ module ValidateGendarmeEmulation =
             Gendarme.Rules.Maintainability.AvoidComplexMethodsRule.GetCyclomaticComplexity
               m, Gendarme.cyclomaticComplexity m))
           >> (fun (n, e, r) ->
-          if r <> e then Some(n, e, r) else None))
+          importantItems(n, e, r)))
           (def.MainModule.Types
           |> Seq.cast<TypeDefinition>
           |> Seq.map Rocks.GetAllTypes
@@ -110,10 +112,8 @@ module ValidateGendarmeEmulation =
           |> List.map (fun t -> t.Methods |> Seq.cast<MethodDefinition>)
           |> Seq.concat
           |> Seq.sortBy (fun m -> m.FullName)))
-      |> Seq.filter Option.isSome
-      |> Seq.map (fun x ->
-            let n, e, r = Option.get x
-            sprintf "Expected %d got %d in %s" e r n)
+      |> seqStringify
+      |> Seq.choose id
       |> Seq.toList
     test <@ List.isEmpty failures @>
 

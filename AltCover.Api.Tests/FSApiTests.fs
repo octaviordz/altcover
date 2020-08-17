@@ -10,20 +10,8 @@ open System.Xml.Schema
 
 open AltCover
 open Microsoft.FSharp.Reflection
-open Swensen.Unquote
-
-#if NETCOREAPP3_0
-[<AttributeUsage(AttributeTargets.Method)>]
-type TestAttribute() = class
-    inherit Attribute()
-end
-#else
-type TestAttribute = NUnit.Framework.TestAttribute
-#endif
 
 module FSApiTests =
-  let SolutionDir() =
-    SolutionRoot.location
 
   [<Test>]
   let FormatFromCoverletMeetsSpec() =
@@ -430,10 +418,13 @@ module FSApiTests =
     test <@ DotNet.ToTestArguments prep coll combined =
       "/p:AltCover=\"true\" /p:AltCoverReportFormat=\"OpenCover\" /p:AltCoverShowStatic=\"-\" /p:AltCoverShowSummary=\"R\" /p:AltCoverForce=\"true\" /p:AltCoverFailFast=\"true\"" @>
 
+#if SOURCEMAP
+  let SolutionDir() =
+    SolutionRoot.location
+
   let internal mangleFile (f:String) =
     f.Replace(@"C:\Users\steve\Documents\GitHub\altcover", SolutionRoot.location).Replace('\\', Path.DirectorySeparatorChar)
 
-#if SOURCEMAP
   [<Test>]
   let NCoverFindsFiles() =
     use stream =

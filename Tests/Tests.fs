@@ -13,7 +13,8 @@ open Mono.Cecil
 open Mono.Cecil.Cil
 open Mono.Cecil.Rocks
 open N
-open Swensen.Unquote
+
+#nowarn "25"
 
 [<NUnit.Framework.IncludeExcludeAttribute>]
 type ProxyObject() =
@@ -34,16 +35,12 @@ type ProxyObject() =
 #endif
     let t = assembly.ExportedTypes |> Seq.filter (fun t -> t.FullName = typeName)
     this.Type <- Seq.tryHead t
-    match this.Type with
-    | None -> ()
-    | Some t -> this.Object <- Activator.CreateInstance(t, args)
+    this.Object <- Activator.CreateInstance(this.Type |> Option.get, args)
 
   member this.InvokeMethod(methodName : string, args : obj []) =
-    match this.Type with
-    | None -> null
-    | Some t ->
-      let methodinfo = t.GetMethod(methodName)
-      methodinfo.Invoke(this.Object, args)
+    let t = this.Type |> Option.get
+    let methodinfo = t.GetMethod(methodName)
+    methodinfo.Invoke(this.Object, args)
 
 [<AutoOpen>]
 module Extensions =
@@ -55,8 +52,12 @@ module Extensions =
           else i |> sbyte |> Microsoft.FSharp.Core.LanguagePrimitives.EnumOfValue<sbyte, Exemption>
 
 module AltCoverTests =
-    let SolutionDir() =
-      SolutionRoot.location
+
+#if NETCOREAPP2_0
+    let dir = Path.Combine(SolutionDir(), "_Binaries/AltCover.Tests/Debug+AnyCPU/netcoreapp3.0")
+#else
+    let dir = Path.Combine(SolutionDir(), "_Binaries/AltCover.Tests/Debug+AnyCPU/net472")
+#endif
 
     let monoSample1path = Path.Combine(SolutionDir(), "_Mono/Sample1/Sample1.exe")
 #if NETCOREAPP2_0
@@ -76,18 +77,6 @@ module AltCoverTests =
       |> Seq.find (fun n -> n.EndsWith("Infrastructure.snk", StringComparison.Ordinal))
 
     let private FF(a,b,c) = { Scope = a; Regex = b; Sense = c }
-
-    // Hack for running while instrumented
-    let Hack() =
-      let where = Assembly.GetExecutingAssembly().Location
-
-      let dir =
-        where
-        |> Path.GetDirectoryName
-        |> Path.GetFileName
-      match dir.IndexOf "__" with
-      | 0 -> "/.."
-      | _ -> String.Empty
 
     // Augment.fs
     [<Test>]
@@ -109,127 +98,120 @@ module AltCoverTests =
     // ProgramDatabase.fs
     [<Test>]
     let ShouldGetPdbFromImage() =
-      let where = Assembly.GetExecutingAssembly().Location
-      let pdb = Path.ChangeExtension(where, ".pdb")
-      if File.Exists(pdb) then
-        // Hack for running while instrumented
-        let files =
-          Directory.GetFiles(Path.GetDirectoryName(where) + Hack())
-          |> Seq.filter
-               (fun x ->
-               x.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
-               || x.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter (fun f -> f |> Path.GetFileNameWithoutExtension <> "testhost")
-          |> Seq.filter (fun f -> f |> Path.GetFileName <> "AltCover.Tests.exe")
-          |> Seq.filter (fun f -> f |> Path.GetFileName <> "CompilerAttributes.dll")
-          |> Seq.map (fun x -> (x, Mono.Cecil.AssemblyDefinition.ReadAssembly x))
-          |> Seq.filter (fun x ->
-               (fst x) + ".mdb"
-               |> File.Exists
-               |> not)
-          |> Seq.filter
-               (fun x ->
-               not
-               <| (snd x).FullName.StartsWith("altcode.", StringComparison.OrdinalIgnoreCase))
+      let files =
+        Directory.GetFiles(dir)
+        |> Seq.filter
+              (fun x ->
+              x.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+              || x.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter (fun f -> f |> Path.GetFileNameWithoutExtension <> "testhost")
+        |> Seq.filter (fun f -> f |> Path.GetFileName <> "AltCover.Tests.exe")
+        |> Seq.filter (fun f -> f |> Path.GetFileName <> "CompilerAttributes.dll")
+        |> Seq.map (fun x -> (x, Mono.Cecil.AssemblyDefinition.ReadAssembly x))
+        |> Seq.filter (fun x ->
+              (fst x) + ".mdb"
+              |> File.Exists
+              |> not)
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("altcode.", StringComparison.OrdinalIgnoreCase))
 #if NETCOREAPP2_0
-          |> Seq.filter
-               (fun x ->
-               not
-               <| (snd x).FullName.StartsWith("Expecto", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-               (fun x ->
-               not
-               <| (snd x).FullName.StartsWith("ICSharp", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-               (fun x ->
-               not
-               <| (snd x).FullName.StartsWith("Mono.", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-                (fun x ->
-                not
-                <| (snd x).FullName.StartsWith("BlackFox.", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-                (fun x ->
-                not
-                <| (snd x).FullName.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-                (fun x ->
-                not
-                <| (snd x).FullName.StartsWith("Manatee.", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-                (fun x ->
-                not
-                <| (snd x).FullName.StartsWith("Newtonsoft.", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-                (fun x ->
-                not
-                <| (snd x).FullName.StartsWith("NuGet.", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-               (fun x ->
-               not
-               <| (snd x).FullName.StartsWith("nunit", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-               (fun x ->
-               not
-               <| (snd x)
-                 .FullName.StartsWith("FSharp.", StringComparison.OrdinalIgnoreCase))
-          // for coverlet
-          |> Seq.filter
-               (fun x ->
-               not
-               <| (snd x)
-                 .FullName.StartsWith("coverlet", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-               (fun x ->
-               not
-               <| (snd x)
-                 .FullName.StartsWith("AltCover,", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-                (fun x ->
-                not
-                <| (snd x).FullName.StartsWith("System.", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-                (fun x ->
-                not
-                <| (snd x).FullName.StartsWith("Unquote", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-               (fun x ->
-               not
-               <| (snd x).FullName.StartsWith("xunit", StringComparison.OrdinalIgnoreCase))
-          |> Seq.filter
-               (fun x ->
-               not
-               <| (snd x)
-                 .FullName.StartsWith("AltCover.Recorder",
-                                      StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("Expecto", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("ICSharp", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("Mono.", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("BlackFox.", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("Manatee.", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("Newtonsoft.", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("NuGet.", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("nunit", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x)
+                .FullName.StartsWith("FSharp.", StringComparison.OrdinalIgnoreCase))
+        // for coverlet
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x)
+                .FullName.StartsWith("coverlet", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x)
+                .FullName.StartsWith("AltCover,", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("System.", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("Unquote", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x).FullName.StartsWith("xunit", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter
+              (fun x ->
+              not
+              <| (snd x)
+                .FullName.StartsWith("AltCover.Recorder",
+                                    StringComparison.OrdinalIgnoreCase))
 #else
-          |> Seq.filter (fun x -> (snd x).FullName.EndsWith("PublicKeyToken=c02b1a9f5b7cade8", StringComparison.OrdinalIgnoreCase))
+        |> Seq.filter (fun x -> (snd x).FullName.EndsWith("PublicKeyToken=c02b1a9f5b7cade8", StringComparison.OrdinalIgnoreCase))
 #endif
-          |> Seq.toList
-        test <@ files <> [] @>
-        files
-        |> Seq.iter
-             (fun x ->
-             let pdb = AltCover.ProgramDatabase.getPdbFromImage(snd x)
-             match pdb with
-             | None -> Assert.Fail("No .pdb for " + (fst x))
-             | Some name ->
-               let probe = Path.ChangeExtension((fst x), ".pdb")
-               let file = FileInfo(probe)
-               let filename = file.Name.Replace("\\", "/")
-               Assert.That
-                 ("/" + name.Replace("\\", "/"), Does.EndWith("/" + filename),
-                  (fst x) + " -> " + name))
-#if MONO
-// Mono doesn't embed
-#else
+        |> Seq.toList
+      test <@ files <> [] @>
+      files
+      |> Seq.iter
+            (fun x ->
+            let pdb = AltCover.ProgramDatabase.getPdbFromImage(snd x)
+            match pdb with
+            | Some name ->
+              let probe = Path.ChangeExtension((fst x), ".pdb")
+              let file = FileInfo(probe)
+              let filename = file.Name.Replace("\\", "/")
+              Assert.That
+                ("/" + name.Replace("\\", "/"), Does.EndWith("/" + filename),
+                (fst x) + " -> " + name))
+
+#if !MONO // Mono doesn't embed
     [<Test>]
     let ShouldGetEmbeddedPdbFromImage() =
       let target = sample8path
       let image = Mono.Cecil.AssemblyDefinition.ReadAssembly target
       let pdb = AltCover.ProgramDatabase.getPdbFromImage image
       match pdb with
-      | None -> Assert.Fail("No .pdb for " + target)
       | Some name ->
         Assert.That
           (name, Is.EqualTo "Sample8.pdb",
@@ -238,8 +220,6 @@ module AltCoverTests =
 
     [<Test>]
     let ShouldGetNoMdbFromMonoImage() =
-      // Hack for running while instrumented
-      let where = Assembly.GetExecutingAssembly().Location
       let path = Path.GetDirectoryName monoSample1path
       let files =
         Directory.GetFiles(path)
@@ -256,15 +236,11 @@ module AltCoverTests =
            let probe = (fst x) + ".mdb"
            let pdb = AltCover.ProgramDatabase.getPdbFromImage(snd x)
            match pdb with
-           | None -> Assert.That(File.Exists probe, probe + " not found")
-           | Some name -> Assert.Fail("Suddenly, an .mdb for " + (fst x)))
+           | None -> Assert.That(File.Exists probe, probe + " not found"))
 
     [<Test>]
     let ShouldGetPdbWithFallback() =
-      // Hack for running while instrumented
-      let where = Assembly.GetExecutingAssembly().Location
-      let files = Directory.GetFiles(Path.GetDirectoryName(where) + Hack())
-      files
+      Directory.GetFiles(dir)
       |> Seq.filter
            (fun x ->
            x.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
@@ -294,18 +270,9 @@ module AltCoverTests =
 
     [<Test>]
     let ShouldGetForeignPdbWithFallback() =
-      // Hack for running while instrumented
-      let where = Assembly.GetExecutingAssembly().Location
-      let path = Path.Combine(where.Substring(0, where.IndexOf("_Binaries")), "packages")
-#if NETCOREAPP2_0
-      let path' =
-        if Directory.Exists path then path
-        else Path.Combine(where.Substring(0, where.IndexOf("_Binaries")), "../packages")
-#else
-      let path' = path
-#endif
+      let path = Path.Combine(SolutionDir(), "packages")
       // Looking for the Mono.Options symbols
-      let files = Directory.GetFiles(path', "*.pdb", SearchOption.AllDirectories)
+      let files = Directory.GetFiles(path, "*.pdb", SearchOption.AllDirectories)
       files
       |> Seq.filter (fun p -> Path.ChangeExtension(p, ".dll") |> File.Exists)
       |> Seq.iter (fun p ->
@@ -315,26 +282,17 @@ module AltCoverTests =
              let pdb = AltCover.ProgramDatabase.getPdbWithFallback(def)
              let normalized = Path.Combine(Path.GetDirectoryName p, Path.GetFileName p)
              match pdb with
-             | None -> Assert.Fail("Not found " + p)
              | Some name -> Assert.That(name, Is.EqualTo normalized)
            with :? BadImageFormatException -> ())
 
     [<Test>]
     let ShouldGetForeignPdbWithFallbackWhenNotColocated() =
       try
-        // Hack for running while instrumented
         let where = Assembly.GetExecutingAssembly().Location
         let path =
-          Path.Combine(where.Substring(0, where.IndexOf("_Binaries")), "packages")
-#if NETCOREAPP2_0
-        let path' =
-          if Directory.Exists path then path
-          else Path.Combine(where.Substring(0, where.IndexOf("_Binaries")), "../packages")
-#else
-        let path' = path
-#endif
+          Path.Combine(SolutionDir(), "packages")
         // Looking for the Mono.Options symbols
-        let files = Directory.GetFiles(path', "*.pdb", SearchOption.AllDirectories)
+        let files = Directory.GetFiles(path, "*.pdb", SearchOption.AllDirectories)
         files
         |> Seq.filter (fun p -> Path.ChangeExtension(p, ".dll") |> File.Exists)
         |> Seq.iter (fun p ->
@@ -353,7 +311,6 @@ module AltCoverTests =
                let pdb = AltCover.ProgramDatabase.getPdbWithFallback(def)
                let normalized = Path.Combine(Path.GetDirectoryName p, Path.GetFileName p)
                match pdb with
-               | None -> Assert.Fail("Not found " + p)
                | Some name ->
                  Assert.That(name, Is.EqualTo normalized)
                  AltCover.ProgramDatabase.readSymbols def
@@ -364,8 +321,6 @@ module AltCoverTests =
 
     [<Test>]
     let ShouldGetMdbWithFallback() =
-      // Hack for running while instrumented
-      let where = Assembly.GetExecutingAssembly().Location
       let path = Path.GetDirectoryName monoSample1path
       let files = Directory.GetFiles(path)
       files
@@ -378,7 +333,7 @@ module AltCoverTests =
            let def = Mono.Cecil.AssemblyDefinition.ReadAssembly x
            let mdb = AltCover.ProgramDatabase.getPdbWithFallback(def)
            match mdb with
-           | None -> Assert.That(File.Exists(x + ".mdb"), Is.Not.True, "No .mdb for " + x)
+//           | None -> Assert.That(File.Exists(x + ".mdb"), Is.Not.True, "No .mdb for " + x)
            | Some name ->
              let probe = x + ".mdb"
              let file = FileInfo(probe)
@@ -389,46 +344,36 @@ module AltCoverTests =
 
     [<Test>]
     let ShouldGetSymbolsFromPdb() =
-      let where = Assembly.GetExecutingAssembly().Location
-      let pdb = Path.ChangeExtension(where, ".pdb")
-      if File.Exists(pdb) then
-        // Hack for running while instrumented
-        let files =
-          Directory.GetFiles(Path.GetDirectoryName(where) + Hack())
-        files
-        |> Seq.filter
-             (fun x ->
-             x.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
-             || x.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-        |> Seq.filter (fun f -> f |> Path.GetFileNameWithoutExtension <> "testhost")
-        |> Seq.filter (fun f -> f |> Path.GetFileName <> "AltCover.Tests.exe")
-        |> Seq.map Mono.Cecil.AssemblyDefinition.ReadAssembly
-        |> Seq.filter
-             (fun x ->
-             not
-             <| x.FullName.StartsWith("altcode.", StringComparison.OrdinalIgnoreCase))
-#if COVERLET
-        |> Seq.filter
-             (fun x ->
-             not <| x.FullName.StartsWith("AltCover,", StringComparison.OrdinalIgnoreCase))
-        |> Seq.filter
-             (fun x ->
-             not
-             <| x.FullName.StartsWith
-                  ("AltCover.Recorder", StringComparison.OrdinalIgnoreCase))
-#endif
-        |> Seq.filter
-             (fun x ->
-             x.FullName.EndsWith
-               ("PublicKeyToken=c02b1a9f5b7cade8", StringComparison.OrdinalIgnoreCase))
-        |> Seq.iter (fun def ->
-             AltCover.ProgramDatabase.readSymbols def
-             Assert.That(def.MainModule.HasSymbols, def.MainModule.FileName))
+      Directory.GetFiles(dir)
+      |> Seq.filter
+            (fun x ->
+            x.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+            || x.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+      |> Seq.filter (fun f -> f |> Path.GetFileNameWithoutExtension <> "testhost")
+      |> Seq.filter (fun f -> f |> Path.GetFileName <> "AltCover.Tests.exe")
+      |> Seq.map Mono.Cecil.AssemblyDefinition.ReadAssembly
+      |> Seq.filter
+            (fun x ->
+            not
+            <| x.FullName.StartsWith("altcode.", StringComparison.OrdinalIgnoreCase))
+      |> Seq.filter
+            (fun x ->
+            not <| x.FullName.StartsWith("AltCover,", StringComparison.OrdinalIgnoreCase))
+      |> Seq.filter
+            (fun x ->
+            not
+            <| x.FullName.StartsWith
+                ("AltCover.Recorder", StringComparison.OrdinalIgnoreCase))
+      |> Seq.filter
+            (fun x ->
+            x.FullName.EndsWith
+              ("PublicKeyToken=c02b1a9f5b7cade8", StringComparison.OrdinalIgnoreCase))
+      |> Seq.iter (fun def ->
+            AltCover.ProgramDatabase.readSymbols def
+            Assert.That(def.MainModule.HasSymbols, def.MainModule.FileName))
 
     [<Test>]
     let ShouldGetSymbolsFromEmbeddedPdb() =
-      let where = Assembly.GetExecutingAssembly().Location
-      let here = where |> Path.GetDirectoryName
       let target = sample8path
       let image = Mono.Cecil.AssemblyDefinition.ReadAssembly target
       AltCover.ProgramDatabase.readSymbols image
@@ -436,10 +381,7 @@ module AltCoverTests =
 
     [<Test>]
     let ShouldNotGetSymbolsWhenNoPdb() =
-      // Hack for running while instrumented
-      let where = Assembly.GetExecutingAssembly().Location
-      let files = Directory.GetFiles(Path.GetDirectoryName(where) + Hack())
-      files
+      Directory.GetFiles(dir)
       |> Seq.filter
            (fun x ->
            x.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
@@ -673,8 +615,7 @@ module AltCoverTests =
     [<Test>]
     let Sample3Class1IsCSharpAutoproperty() =
       let sample3 =
-        Path.Combine
-          (Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Sample3.dll")
+        Path.Combine(dir, "Sample3.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly(sample3)
       def.MainModule.Types
       |> Seq.filter (fun t -> t.Name = "Class1")
@@ -686,7 +627,7 @@ module AltCoverTests =
     let Sample3Class2IsNotCSharpAutoproperty() =
       let sample3 =
         Path.Combine
-          (Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Sample3.dll")
+          (dir, "Sample3.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly(sample3)
       def.MainModule.Types
       |> Seq.filter (fun t -> t.Name = "Class2")
@@ -720,8 +661,8 @@ module AltCoverTests =
       let indirect3 =
         indirect2
         |> Seq.filter (fun t -> t.HasNestedTypes)
-        |> Seq.collect (fun t -> t.NestedTypes)
-        |> Seq.map (fun t -> t.FullName)
+        // |> Seq.collect (fun t -> t.NestedTypes)
+        // |> Seq.map (fun t -> t.FullName)
         |> Seq.toList
 
       Assert.That
@@ -827,9 +768,8 @@ module AltCoverTests =
     let ValidateAutomaticExemption() =
       try
         CoverageParameters.showGenerated := true
-        let where = Assembly.GetExecutingAssembly().Location
         let path =
-          Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample4.dll")
+          Path.Combine(dir, "Sample4.dll")
         use def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
         let items =
           def.MainModule.GetAllTypes()
@@ -853,7 +793,7 @@ module AltCoverTests =
 
       let toolPackages =
         let xml =
-          Path.Combine(SolutionRoot.location, "./Build/NuGet.csproj")
+          Path.Combine(SolutionDir(), "./Build/NuGet.csproj")
           |> Path.GetFullPath
           |> XDocument.Load
         xml.Descendants(XName.Get("PackageReference"))
@@ -864,7 +804,7 @@ module AltCoverTests =
 
       let libPackages =
         let xml =
-          Path.Combine(SolutionRoot.location, "./MCS/packages.config")
+          Path.Combine(SolutionDir(), "./MCS/packages.config")
           |> Path.GetFullPath
           |> XDocument.Load
         xml.Descendants(XName.Get("package"))
@@ -875,11 +815,11 @@ module AltCoverTests =
 
       CoverageParameters.local := false
       CoverageParameters.nameFilters.Clear()
-      let fscore = Path.Combine(SolutionRoot.location, "packages/FSharp.Core.4.5.2/lib/net45") // stable retro version
-      let mono = Path.Combine(SolutionRoot.location, "packages/Mono.Cecil." +
+      let fscore = Path.Combine(SolutionDir(), "packages/FSharp.Core.4.5.2/lib/net45") // stable retro version
+      let mono = Path.Combine(SolutionDir(), "packages/Mono.Cecil." +
                                                       (libPackages.Item "mono.cecil") +
                                                       "/lib/net40")
-      let nuget = Path.Combine(SolutionRoot.location, "packages/nuget.commandline/" +
+      let nuget = Path.Combine(SolutionDir(), "packages/nuget.commandline/" +
                                                       (toolPackages.Item "nuget.commandline") +
                                                       "/tools")
       let exe = Path.Combine(nuget, "NuGet.exe")
@@ -994,16 +934,14 @@ module AltCoverTests =
         |> List.skip 1
         |> List.iteri (fun i node ->
              match node with
-             | (BranchPoint b) -> Assert.That(b.Uid, Is.EqualTo i, "branch point number")
-             | _ -> Assert.Fail("branch point expected"))
+             | (BranchPoint b) -> Assert.That(b.Uid, Is.EqualTo i, "branch point number"))
         deeper
         |> List.take 1
         |> List.iteri (fun i node ->
              match node with
              | (MethodPoint(_, _, n, b, Exemption.None)) ->
                Assert.That(n, Is.EqualTo i, "point number")
-               Assert.That(b, Is.True, "flag " + i.ToString())
-             | _ -> Assert.Fail("sequence point expected"))
+               Assert.That(b, Is.True, "flag " + i.ToString()))
       finally
         CoverageParameters.nameFilters.Clear()
         CoverageParameters.theReportFormat <- None
@@ -1045,16 +983,14 @@ module AltCoverTests =
         |> List.skip 1
         |> List.iteri (fun i node ->
              match node with
-             | (BranchPoint b) -> Assert.That(b.Uid, Is.EqualTo i, "branch point number")
-             | _ -> Assert.Fail("branch point expected"))
+             | (BranchPoint b) -> Assert.That(b.Uid, Is.EqualTo i, "branch point number"))
         deeper
         |> List.take 1
         |> List.iteri (fun i node ->
              match node with
              | (MethodPoint(_, _, n, b, Exemption.Automatic)) ->
                Assert.That(n, Is.EqualTo i, "point number")
-               Assert.That(b, Is.True, "flag " + i.ToString())
-             | _ -> Assert.Fail("sequence point expected"))
+               Assert.That(b, Is.True, "flag " + i.ToString()))
       finally
         CoverageParameters.coalesceBranches := false
         CoverageParameters.nameFilters.Clear()
@@ -1064,7 +1000,7 @@ module AltCoverTests =
     let CSharpNestedMethods() =
       let sample3 =
         Path.Combine
-          (Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Sample5.dll")
+          (dir, "Sample5.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly(sample3)
 
       let methods =
@@ -1189,7 +1125,7 @@ module AltCoverTests =
     let FSharpNestedMethods() =
       let sample3 =
         Path.Combine
-          (Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Sample6.dll")
+          (dir, "Sample6.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly(sample3)
 
       let methods =
@@ -1405,7 +1341,7 @@ module AltCoverTests =
     let Sample3Class1PropertyIsNotSignificant() =
       let sample3 =
         Path.Combine
-          (Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Sample3.dll")
+          (dir, "Sample3.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly(sample3)
       def.MainModule.Types
       |> Seq.filter (fun t -> t.Name = "Class1")
@@ -1417,7 +1353,7 @@ module AltCoverTests =
     let Sample3Class2IPropertyIsSignificant() =
       let sample3 =
         Path.Combine
-          (Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Sample3.dll")
+          (dir, "Sample3.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly(sample3)
       def.MainModule.Types
       |> Seq.filter (fun t -> t.Name = "Class2")
@@ -1474,25 +1410,22 @@ module AltCoverTests =
         |> List.skip 10
         |> List.iteri (fun i node ->
              match node with
-             | (BranchPoint b) -> Assert.That(b.Uid, Is.EqualTo i, "branch point number")
-             | _ -> Assert.Fail())
+             | (BranchPoint b) -> Assert.That(b.Uid, Is.EqualTo i, "branch point number"))
         deeper
         |> List.take 10
         |> List.iteri (fun i node ->
              match node with
              | (MethodPoint(_, _, n, b, Exemption.None)) ->
                Assert.That(n, Is.EqualTo i, "point number")
-               Assert.That(b, Is.False, "flag")
-             | _ -> Assert.Fail())
+               Assert.That(b, Is.False, "flag"))
       finally
         CoverageParameters.nameFilters.Clear()
         CoverageParameters.theReportFormat <- None
 
     [<Test>]
     let BranchPointsAreComputedForSwitch() =
-      let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample16.dll")
+        Path.Combine(dir, "Sample16.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
       ProgramDatabase.readSymbols def
       let method =
@@ -1526,9 +1459,7 @@ module AltCoverTests =
           |> List.mapi (fun i node ->
                match node with
                | (BranchPoint b) -> Assert.That(b.Uid, Is.EqualTo i, "branch point number")
-                                    Some b
-               | _ -> Assert.Fail("branch point expected")
-                      None)
+                                    Some b)
           |> List.choose id
         deeper
         |> List.take 21
@@ -1536,8 +1467,7 @@ module AltCoverTests =
              match node with
              | (MethodPoint(_, _, n, b, Exemption.Declared)) ->
                Assert.That(n, Is.EqualTo i, "point number")
-               Assert.That(b, Is.True, "flag " + i.ToString())
-             | _ -> Assert.Fail("sequence point expected"))
+               Assert.That(b, Is.True, "flag " + i.ToString()))
 
         Assert.That (
           branches
@@ -1551,9 +1481,8 @@ module AltCoverTests =
 
     [<Test>]
     let BranchPointsAreComputedForMatch() =
-      let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample17.dll")
+        Path.Combine(dir, "Sample17.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
       ProgramDatabase.readSymbols def
       let method =
@@ -1581,16 +1510,14 @@ module AltCoverTests =
         |> List.skip 9
         |> List.iteri (fun i node ->
              match node with
-             | (BranchPoint b) -> Assert.That(b.Uid, Is.EqualTo i, "branch point number")
-             | _ -> Assert.Fail("branch point expected"))
+             | (BranchPoint b) -> Assert.That(b.Uid, Is.EqualTo i, "branch point number"))
         deeper
         |> List.take 9
         |> List.iteri (fun i node ->
              match node with
              | (MethodPoint(_, _, n, b, Exemption.StaticAnalysis)) ->
                Assert.That(n, Is.EqualTo i, "point number")
-               Assert.That(b, Is.True, "flag " + i.ToString())
-             | _ -> Assert.Fail("sequence point expected"))
+               Assert.That(b, Is.True, "flag " + i.ToString()))
       finally
         CoverageParameters.coalesceBranches := false
         CoverageParameters.nameFilters.Clear()
@@ -1657,8 +1584,7 @@ module AltCoverTests =
           |> Seq.filter Visitor.I.stripInterfaces
           |> Seq.map (fun t ->
                let flag =
-                 if t.Name <> "Program" then Inspections.Instrument
-                 else Inspections.Ignore
+                 maybe (t.Name <> "Program") Inspections.Instrument Inspections.Ignore
 
                let node = Node.Type(t, flag, Exemption.None)
                List.concat [ [ node ]
@@ -1709,9 +1635,6 @@ module AltCoverTests =
         let def =
           match Seq.head deeper with
           | Node.Assembly(def', Inspections.Instrument, []) -> def'
-          | _ ->
-            Assert.Fail()
-            null
 
         let assembly = Node.Assembly(def, Inspections.Instrument, [])
 
@@ -1748,9 +1671,6 @@ module AltCoverTests =
         let def =
           match Seq.head deeper with
           | Node.Assembly(def', Inspections.Ignore, []) -> def'
-          | _ ->
-            Assert.Fail()
-            null
 
         let assembly = Node.Assembly(def, Inspections.Ignore, [])
 
@@ -1819,9 +1739,6 @@ module AltCoverTests =
         let def =
           match accumulator.[1] with
           | Node.Assembly(def', Inspections.Instrument, ux) -> def'
-          | _ ->
-            Assert.Fail()
-            null
 
         let assembly = Node.Assembly(def, Inspections.Instrument, ux)
 
@@ -1838,9 +1755,8 @@ module AltCoverTests =
 
     [<Test>]
     let TrackingDetectsTests() =
-      let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample2.dll")
+        Path.Combine(dir, "Sample2.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
       ProgramDatabase.readSymbols def
       try
@@ -1862,9 +1778,8 @@ module AltCoverTests =
 
     [<Test>]
     let TrackingDetectsExpectedTests() =
-      let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample2.dll")
+        Path.Combine(dir, "Sample2.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
       ProgramDatabase.readSymbols def
       try
@@ -1889,7 +1804,7 @@ module AltCoverTests =
     let TrackingDetectsTestsByFullType() =
       let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample2.dll")
+        Path.Combine(dir, "Sample2.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
       ProgramDatabase.readSymbols def
       try
@@ -1914,7 +1829,7 @@ module AltCoverTests =
     let TrackingDetectsMethods() =
       let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample2.dll")
+        Path.Combine(dir, "Sample2.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
       ProgramDatabase.readSymbols def
       try
@@ -1956,7 +1871,7 @@ module AltCoverTests =
     let TypeNamesAreExtracted() =
       let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample3.dll")
+        Path.Combine(dir, "Sample3.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
 
       let names =
@@ -1971,7 +1886,7 @@ module AltCoverTests =
     let FullTypeNamesAreExtracted() =
       let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample3.dll")
+        Path.Combine(dir, "Sample3.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
 
       let names =
@@ -1988,7 +1903,7 @@ module AltCoverTests =
     let TypeRefNamesAreExtracted() =
       let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample3.dll")
+        Path.Combine(dir, "Sample3.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
 
       let names =
@@ -2006,7 +1921,7 @@ module AltCoverTests =
     let FullTypeRefNamesAreExtracted() =
       let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample3.dll")
+        Path.Combine(dir, "Sample3.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
 
       let names =
@@ -2029,7 +1944,7 @@ module AltCoverTests =
     let MethodNamesAreExtracted() =
       let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample3.dll")
+        Path.Combine(dir, "Sample3.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
 
       let names =
@@ -2051,7 +1966,7 @@ module AltCoverTests =
     let FullMethodNamesAreExtracted() =
       let where = Assembly.GetExecutingAssembly().Location
       let path =
-        Path.Combine(Path.GetDirectoryName(where) + Hack(), "Sample3.dll")
+        Path.Combine(dir, "Sample3.dll")
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
 
       let names =
@@ -2132,8 +2047,7 @@ module AltCoverTests =
                      a1.Name.ToString() + " : " + r.ToString() + " -> document")
                 | "visitcount" ->
                   let expected =
-                    if zero then "0"
-                    else a2.Value
+                    maybe zero "0" a2.Value
                   Assert.That
                     (a1.Value, Is.EqualTo(expected), r.ToString() + " -> visitcount")
                 | _ ->
@@ -2193,15 +2107,15 @@ module AltCoverTests =
         Visitor.visit [ visitor1 ] (Visitor.I.toSeq (path, []))
         let names1 = document1.Descendants(XName.Get "method")
                      |> Seq.filter (fun mx -> mx.Attribute(XName.Get "excluded").Value = "true")
-                     |> Seq.map (fun mx -> mx.Attribute(XName.Get "name").Value)
-                     |> Seq.filter (fun n -> n <> "Main")
-                     |> Seq.sortBy (fun n -> BitConverter.ToInt32(
-                                              n.ToCharArray()
-                                              |> Seq.take 4
-                                              |> Seq.rev
-                                              |> Seq.map byte
-                                              |> Seq.toArray,
-                                              0))
+                    //  |> Seq.map (fun mx -> mx.Attribute(XName.Get "name").Value)
+                    //  |> Seq.filter (fun n -> n <> "Main")
+                    //  |> Seq.sortBy (fun n -> BitConverter.ToInt32(
+                    //                           n.ToCharArray()
+                    //                           |> Seq.take 4
+                    //                           |> Seq.rev
+                    //                           |> Seq.map byte
+                    //                           |> Seq.toArray,
+                    //                           0))
                      |> Seq.toList
         test <@ List.isEmpty names1 @>
 
@@ -2291,16 +2205,16 @@ module AltCoverTests =
         Visitor.visit [ visitor6 ] (Visitor.I.toSeq (path6, []))
         let names6 = document6.Descendants(XName.Get "method")
                      |> Seq.filter (fun mx -> mx.Attribute(XName.Get "excluded").Value = "false")
-                     |> Seq.map (fun mx -> (mx.Attribute(XName.Get "name").Value + "    ",
-                                            mx.Attribute(XName.Get "class").Value))
-                     |> Seq.sortBy (fun (n, _) -> BitConverter.ToInt32(
-                                                    n.ToCharArray()
-                                                    |> Seq.take 4
-                                                    |> Seq.rev
-                                                    |> Seq.map byte
-                                                    |> Seq.toArray,
-                                                    0))
-                     |> Seq.map (fun (n,c) -> c + "." + n.Trim())
+                    //  |> Seq.map (fun mx -> (mx.Attribute(XName.Get "name").Value + "    ",
+                    //                         mx.Attribute(XName.Get "class").Value))
+                    //  |> Seq.sortBy (fun (n, _) -> BitConverter.ToInt32(
+                    //                                 n.ToCharArray()
+                    //                                 |> Seq.take 4
+                    //                                 |> Seq.rev
+                    //                                 |> Seq.map byte
+                    //                                 |> Seq.toArray,
+                    //                                 0))
+                    //  |> Seq.map (fun (n,c) -> c + "." + n.Trim())
                      |> Seq.toList
         test <@ names6 |> List.isEmpty @>
 
@@ -2349,16 +2263,16 @@ module AltCoverTests =
         Visitor.visit [ visitor8 ] (Visitor.I.toSeq (path5, []))
         let names8 = document8.Descendants(XName.Get "method")
                      |> Seq.filter (fun mx -> mx.Attribute(XName.Get "excluded").Value = "false")
-                     |> Seq.map (fun mx -> (mx.Attribute(XName.Get "name").Value + "    ",
-                                            mx.Attribute(XName.Get "class").Value))
-                     |> Seq.sortBy (fun (n, _) -> BitConverter.ToInt32(
-                                                    n.ToCharArray()
-                                                    |> Seq.take 4
-                                                    |> Seq.rev
-                                                    |> Seq.map byte
-                                                    |> Seq.toArray,
-                                                    0))
-                     |> Seq.map (fun (n,c) -> c + "." + n.Trim())
+                    //  |> Seq.map (fun mx -> (mx.Attribute(XName.Get "name").Value + "    ",
+                    //                         mx.Attribute(XName.Get "class").Value))
+                    //  |> Seq.sortBy (fun (n, _) -> BitConverter.ToInt32(
+                    //                                 n.ToCharArray()
+                    //                                 |> Seq.take 4
+                    //                                 |> Seq.rev
+                    //                                 |> Seq.map byte
+                    //                                 |> Seq.toArray,
+                    //                                 0))
+                    //  |> Seq.map (fun (n,c) -> c + "." + n.Trim())
                      |> Seq.toList
         test <@ names8|> List.isEmpty @>
 
@@ -2370,19 +2284,23 @@ module AltCoverTests =
         }
         |> CoverageParameters.topLevel.Add
 
+        let seqTrim (s : String seq) =
+          s
+          |> Seq.map (fun n -> n.Trim())
+          
         let visitor9, document9 = Report.reportGenerator()
         Visitor.visit [ visitor9 ] (Visitor.I.toSeq (path5, []))
         let names9 = document9.Descendants(XName.Get "method")
                      |> Seq.filter (fun mx -> mx.Attribute(XName.Get "excluded").Value = "false")
                      |> Seq.map (fun mx -> mx.Attribute(XName.Get "name").Value + "    ")
-                     |> Seq.sortBy (fun n -> BitConverter.ToInt32(
-                                              n.ToCharArray()
-                                              |> Seq.take 4
-                                              |> Seq.rev
-                                              |> Seq.map byte
-                                              |> Seq.toArray,
-                                              0))
-                     |> Seq.map (fun n -> n.Trim())
+                    //  |> Seq.sortBy (fun n -> BitConverter.ToInt32(
+                    //                           n.ToCharArray()
+                    //                           |> Seq.take 4
+                    //                           |> Seq.rev
+                    //                           |> Seq.map byte
+                    //                           |> Seq.toArray,
+                    //                           0))
+                     |> seqTrim
                      |> Seq.toList
         test <@ names9 = ["<F1>g__Interior|0_1"] @>
 
@@ -2391,15 +2309,15 @@ module AltCoverTests =
         Visitor.visit [ visitor4 ] (Visitor.I.toSeq (path, []))
         let names4 = document4.Descendants(XName.Get "method")
                      |> Seq.filter (fun mx -> mx.Attribute(XName.Get "excluded").Value = "true")
-                     |> Seq.map (fun mx -> mx.Attribute(XName.Get "name").Value)
-                     |> Seq.filter (fun n -> n <> "Main")
-                     |> Seq.sortBy (fun n -> BitConverter.ToInt32(
-                                              n.ToCharArray()
-                                              |> Seq.take 4
-                                              |> Seq.rev
-                                              |> Seq.map byte
-                                              |> Seq.toArray,
-                                              0))
+                    //  |> Seq.map (fun mx -> mx.Attribute(XName.Get "name").Value)
+                    //  |> Seq.filter (fun n -> n <> "Main")
+                    //  |> Seq.sortBy (fun n -> BitConverter.ToInt32(
+                    //                           n.ToCharArray()
+                    //                           |> Seq.take 4
+                    //                           |> Seq.rev
+                    //                           |> Seq.map byte
+                    //                           |> Seq.toArray,
+                    //                           0))
                      |> Seq.toList
         test <@ List.isEmpty names4 @>
 
@@ -2558,18 +2476,9 @@ module AltCoverTests =
     // Gendarme.fs (except where I need to compare with the original, which are the ValidateGendarmeEmulation tests)
     [<Test>]
     let ShouldDetectTernary() =
-      let where = Assembly.GetExecutingAssembly().Location
-      let path0 =
-        Path.Combine
-          (where.Substring(0, where.IndexOf("_Binaries"))
-           + "_Binaries/Sample3/Debug+AnyCPU/netstandard2.0", "Sample3.dll")
-
       let path =
-        if File.Exists path0 then path0
-        else
-          Path.Combine
-            (where.Substring(0, where.IndexOf("_Binaries"))
-             + "../_Binaries/Sample3/Debug+AnyCPU/netstandard2.0", "Sample3.dll")
+        Path.Combine(SolutionDir(),
+                       "_Binaries/Sample3/Debug+AnyCPU/netstandard2.0/Sample3.dll")
 
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
 
@@ -2595,18 +2504,9 @@ module AltCoverTests =
 
     [<Test>]
     let ShouldDetectSwitchNesting() =
-      let where = Assembly.GetExecutingAssembly().Location
-      let path0 =
-        Path.Combine
-          (where.Substring(0, where.IndexOf("_Binaries"))
-           + "_Binaries/Sample3/Debug+AnyCPU/netstandard2.0", "Sample3.dll")
-
       let path =
-        if File.Exists path0 then path0
-        else
-          Path.Combine
-            (where.Substring(0, where.IndexOf("_Binaries"))
-             + "../_Binaries/Sample3/Debug+AnyCPU/netstandard2.0", "Sample3.dll")
+        Path.Combine(SolutionDir(),
+                       "_Binaries/Sample3/Debug+AnyCPU/netstandard2.0/Sample3.dll")
 
       let def = Mono.Cecil.AssemblyDefinition.ReadAssembly path
 
@@ -2724,8 +2624,7 @@ module AltCoverTests =
                      a1.Name.ToString() + " : " + r.ToString() + " -> document")
                 | "vc" ->
                   let expected =
-                    if zero then "0"
-                    else a2.Value
+                    maybe zero "0" a2.Value
                   Assert.That
                     (a1.Value, Is.EqualTo(expected), r.ToString() + " -> visitcount")
                 | _ ->
@@ -3126,7 +3025,8 @@ module AltCoverTests =
     [<Test>]
     let ShouldGenerateExpectedXmlReportWithTraditionalInterfacesOpenCoverStyle() =
       let visitor, document = OpenCover.reportGenerator()
-      let sample21trad = Path.Combine(SolutionRoot.location, "./Sample21/bin/Debug/net472/Sample21.dll")
+      let sample21trad = Path.Combine(SolutionDir(),
+                                       "./Sample21/bin/Debug/net472/Sample21.dll")
       Assert.That(File.Exists sample21trad, "Test file Sample21 for net47 not built")
       try
         "Program"
@@ -3163,7 +3063,7 @@ module AltCoverTests =
     [<Test>]
     let ShouldGenerateExpectedXmlReportWithModernInterfacesOpenCoverStyle() =
       let visitor, document = OpenCover.reportGenerator()
-      let sample21 = Path.Combine(SolutionRoot.location, "./Sample21/bin/Debug/netcoreapp3.0/Sample21.dll")
+      let sample21 = Path.Combine(SolutionDir(), "./Sample21/bin/Debug/netcoreapp3.0/Sample21.dll")
       Assert.That(File.Exists sample21, "Test file Sample21 for netcoreapp3.0 not built")
       try
         "Program"

@@ -76,7 +76,7 @@ module AltCoverXTests =
                          + r.ToString()
                          + " -> document")
                   | "visitcount" ->
-                      let expected = maybe zero "0" a2.Value
+                      let expected = Maybe zero "0" a2.Value
                       test' <@ expected = a1.Value @> (r.ToString() + " -> visitcount")
                   | _ ->
                       test'
@@ -153,7 +153,7 @@ module AltCoverXTests =
                          + r.ToString()
                          + " -> document")
                   | "vc" ->
-                      let expected = maybe zero "0" a2.Value
+                      let expected = Maybe zero "0" a2.Value
                       test' <@ expected = a1.Value @> (r.ToString() + " -> visitcount")
                   | _ ->
                       test'
@@ -720,17 +720,17 @@ module AltCoverXTests =
 
       let expected =
         "Creating folder "
-        + output
+        + (canonicalDirectory output)
         + "\nInstrumenting files from "
-        + (Path.GetFullPath input)
+        + (canonicalDirectory input)
         + "\nWriting files to "
-        + output
+        + (canonicalDirectory output)
         + "\n   => "
-        + Path.Combine(Path.GetFullPath input, "Sample4.dll")
+        + Path.Combine(canonicalDirectory input, "Sample4.dll")
         + "\n\nCoverage Report: "
         + report
         + "\n\n\n    "
-        + Path.Combine(Path.GetFullPath output, "Sample4.dll")
+        + Path.Combine(canonicalDirectory output, "Sample4.dll")
         + "\n                <=  Sample4, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null\n"
 
       test
@@ -741,11 +741,11 @@ module AltCoverXTests =
 
       test
         <@ CoverageParameters.outputDirectories ()
-           |> Seq.head = output @>
+           |> Seq.head = canonicalDirectory output @>
 
       test
         <@ (CoverageParameters.inputDirectories () |> Seq.head)
-          .Replace("\\", "/") = ((Path.GetFullPath input).Replace("\\", "/")) @>
+          .Replace("\\", "/") = ((canonicalDirectory input).Replace("\\", "/")) @>
 
       test <@ CoverageParameters.reportPath () = report @>
       use stream = new FileStream(key, FileMode.Open)
@@ -774,7 +774,7 @@ module AltCoverXTests =
         System.Environment.GetEnvironmentVariable("OS") = "Windows_NT"
 
       let theFiles =
-        ( maybe isWindows  ("AltCover.Recorder.g.pdb" :: expected) expected)
+        ( Maybe isWindows  ("AltCover.Recorder.g.pdb" :: expected) expected)
         |> List.sortBy (fun f -> f.ToUpperInvariant())
 
       let actualFiles =
@@ -958,17 +958,17 @@ module AltCoverXTests =
 
       let expected =
         "Creating folder "
-        + output
+        + (canonicalDirectory output)
         + "\nInstrumenting files from "
-        + path
+        + (canonicalDirectory path)
         + "\nWriting files to "
-        + output
+        + (canonicalDirectory output)
         + "\n   => "
         + monoSample1path
         + "\n\nCoverage Report: "
         + report
         + "\n\n\n    "
-        + Path.Combine(Path.GetFullPath output, "Sample1.exe")
+        + Path.Combine(canonicalDirectory output, "Sample1.exe")
         + "\n                <=  Sample1, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null\n"
 
       let console = stdout.ToString()
@@ -978,11 +978,11 @@ module AltCoverXTests =
 
       test
         <@ CoverageParameters.outputDirectories ()
-           |> Seq.head = output @>
+           |> Seq.head = (canonicalDirectory output) @>
 
       test
         <@ (CoverageParameters.inputDirectories () |> Seq.head)
-          .Replace("\\", "/") = (path.Replace("\\", "/")) @>
+          .Replace("\\", "/") = ((canonicalDirectory path).Replace("\\", "/")) @>
 
       test <@ CoverageParameters.reportPath () = report @>
       use stream = new FileStream(key, FileMode.Open)
@@ -1009,7 +1009,7 @@ module AltCoverXTests =
         System.Environment.GetEnvironmentVariable("OS") = "Windows_NT"
 
       let expected =
-        (maybe isWindows ("AltCover.Recorder.g.pdb" :: theFiles) theFiles)
+        (Maybe isWindows ("AltCover.Recorder.g.pdb" :: theFiles) theFiles)
         |> List.sortBy (fun f -> f.ToUpperInvariant())
 
       test <@ actual = expected @>

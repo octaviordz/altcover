@@ -1076,14 +1076,6 @@ module AltCoverTests =
       CoverageParameters.single <- save
 
   [<Test>]
-  let FixEnding () =
-    let a = Visitor.I.ensureEndsWith "a" "banana"
-    Assert.That(a, Is.EqualTo "banana")
-
-    let s = Visitor.I.ensureEndsWith "s" "banana"
-    Assert.That(s, Is.EqualTo "bananas")
-
-  [<Test>]
   let ValidateStaticExemption () =
     let result =
       [ StaticFilter.AsCovered
@@ -1214,6 +1206,27 @@ module AltCoverTests =
     let f = AssemblyDefinition.ReadAssembly fdll
     ProgramDatabase.readSymbols f
 
+    // work round the instrumented assemblies having unreliable symbols
+#if !NET472
+    let dir =
+      Path.Combine(
+        SolutionRoot.location,
+        "_Binaries/AltCover.Engine/Debug+AnyCPU/netstandard2.0"
+      )
+#else
+    let dir =
+      Path.Combine(
+        SolutionRoot.location,
+        "_Binaries/AltCover.Engine/Debug+AnyCPU/net472"
+      )
+#endif
+
+    let localAssembly = Path.Combine(dir, "AltCover.Engine.dll")
+                        |> AssemblyDefinition.ReadAssembly
+    ProgramDatabase.readSymbols localAssembly
+
+    Assert.That(localAssembly.LocalFilter, Is.False, "local engine Assembly non-local")
+    Assert.That(localAssembly.MainModule.LocalFilter, Is.False, "local engine  MainModule non-local")
     Assert.That(a.LocalFilter, Is.False, "Assembly non-local")
     Assert.That(a.MainModule.LocalFilter, Is.False, "MainModule non-local")
     Assert.That(m.LocalFilter, Is.False, "dll Assembly non-local")
@@ -1223,6 +1236,8 @@ module AltCoverTests =
 
     try
       CoverageParameters.local := true
+      Assert.That(localAssembly.LocalFilter, Is.False, "local engine  Assembly local")
+      Assert.That(localAssembly.MainModule.LocalFilter, Is.False, "local engine  MainModule local")
       Assert.That(a.LocalFilter, Is.True, "Assembly local")
       Assert.That(a.MainModule.LocalFilter, Is.False, "MainModule local")
       Assert.That(m.LocalFilter, Is.True, "dll Assembly local")
@@ -2594,7 +2609,7 @@ module AltCoverTests =
         |> Seq.map
              (fun t ->
                let flag =
-                 maybe (t.Name <> "Program") Inspections.Instrument Inspections.Ignore
+                 Maybe (t.Name <> "Program") Inspections.Instrument Inspections.Ignore
 
                let node =
                  Node.Type
@@ -3271,7 +3286,7 @@ module AltCoverTests =
                         + " -> document"
                       )
                   | "visitcount" ->
-                      let expected = maybe zero "0" a2.Value
+                      let expected = Maybe zero "0" a2.Value
 
                       Assert.That(
                         a1.Value,
@@ -4245,7 +4260,7 @@ module AltCoverTests =
                         + " -> document"
                       )
                   | "vc" ->
-                      let expected = maybe zero "0" a2.Value
+                      let expected = Maybe zero "0" a2.Value
 
                       Assert.That(
                         a1.Value,

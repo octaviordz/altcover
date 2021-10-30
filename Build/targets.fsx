@@ -835,6 +835,7 @@ _Target
         [ "./AltCover.sln"
           "./AltCover.Visualizer.sln"
           "./Samples/Sample14/Sample14.sln"
+          "./Samples/Sample28/SourceGenerators.sln"
           "MCS.sln" ]
         |> Seq.iter dotnetBuildDebug
 
@@ -6993,6 +6994,33 @@ _Target
             Assert.Fail("Issue #71 experienced"))
 
 _Target "All" ignore
+
+_Target "CppInline" (fun _ ->
+  if Environment.isWindows then
+    Directory.ensure "./_Reports/CppInline"
+    msbuildDebug None "./Samples/Sample29/SimpleMix.sln"
+    OpenCover.run
+        (fun p ->
+            { p with
+                  WorkingDir = "."
+                  ExePath = openCoverConsole
+                  TestRunnerExePath = "./Samples/Sample29/Debug/SimpleMix.exe"
+                  MergeByHash = true
+                  ReturnTargetCode = Fake.DotNet.Testing.OpenCover.ReturnTargetCodeType.Yes
+                  Register = OpenCover.RegisterType.Path64
+                  Output = Path.getFullName "_Reports/CppInlineWithOpenCover.xml"
+                  TimeOut = TimeSpan(0, 10, 0) })
+        String.Empty
+    ReportGenerator.generateReports
+        (fun p ->
+            { p with
+                  ToolType = ToolType.CreateLocalTool()
+                  ReportTypes =
+                      [ ReportGenerator.ReportType.Html
+                        ReportGenerator.ReportType.XmlSummary ]
+                  TargetDir = "_Reports/CppInline" })
+        [ "_Reports/CppInlineWithOpenCover.xml" ]
+)
 
 let resetColours _ =
     Console.ForegroundColor <- consoleBefore |> fst

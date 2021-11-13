@@ -90,14 +90,24 @@ module private Gui =
 
     active
 
+#if NET472
+  [<SuppressMessage("Gendarme.Rules.Performance",
+                    "AvoidUnusedParametersRule",
+                    Justification = "meets an interface")>]
+  [<SuppressMessage("Microsoft.Usage", "CA1801:ReviewUnusedParameters",
+                    Justification = "meets an interface")>]
+  let private urlHook _ link =
+    Browser.ShowUrl(Uri link)
+#endif
+
   let private prepareAboutDialog (handler: Handler) =
 #if !NET472
     handler.aboutVisualizer.TransientFor <- handler.mainWindow
 #else
-    AboutDialog.SetUrlHook(fun _ link -> Browser.ShowUrl(Uri link))
+    AboutDialog.SetUrlHook(urlHook)
     |> ignore
 
-    LinkButton.SetUriHook(fun _ link -> Browser.ShowUrl(Uri link))
+    LinkButton.SetUriHook(urlHook)
     |> ignore
 
     handler.aboutVisualizer.ActionArea.Children.OfType<Button>()
@@ -268,6 +278,11 @@ module private Gui =
   [<SuppressMessage("Microsoft.Globalization",
                     "CA1303:Do not pass literals as localized parameters",
                     Justification = "It's furniture, not user visible text")>]
+  [<SuppressMessage("Gendarme.Rules.Performance",
+                    "AvoidUnusedParametersRule",
+                    Justification = "meets an interface")>]
+  [<SuppressMessage("Microsoft.Usage", "CA1801:ReviewUnusedParameters",
+                    Justification = "meets an interface")>]
   let private prepareOpenFileDialog _ =
     let openFileDialog =
       new System.Windows.Forms.OpenFileDialog()
@@ -921,7 +936,7 @@ module private Gui =
 [<assembly: SuppressMessage("Microsoft.Reliability",
                             "CA2000:Dispose objects before losing scope",
                             Scope = "member",
-                            Target = "AltCover.Gui+prepareTreeView@142.#Invoke(System.Int32,System.Lazy`1<Gdk.Pixbuf>)",
+                            Target = "AltCover.Gui+prepareTreeView@152.#Invoke(System.Int32,System.Lazy`1<Gdk.Pixbuf>)",
                             Justification = "Added to GUI widget tree")>]
 [<assembly: SuppressMessage("Microsoft.Usage",
                             "CA2208:InstantiateArgumentExceptionsCorrectly",

@@ -83,7 +83,7 @@ module GuiCommon =
       | File info -> info.Exists
       | Embed (_, s) -> s |> String.IsNullOrWhiteSpace |> not
       | Url u ->
-          let request = WebRequest.CreateHttp(u)
+          let request = createHttp(u)
           request.Method <- "HEAD"
 
           try
@@ -113,9 +113,7 @@ module GuiCommon =
     member self.ReadAllText() =
       match self with
       | File info -> info.FullName |> File.ReadAllText
-      | Url u ->
-          use client = new System.Net.WebClient()
-          client.DownloadString(u)
+      | Url u -> readAllText u
       | Embed (_,source) -> let data = Convert.FromBase64String source
                             use raw = new MemoryStream(data)
                             use expanded = new MemoryStream()

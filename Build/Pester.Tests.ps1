@@ -42,9 +42,9 @@ Describe "Add-Accelerator" {
 
 Describe "Invoke-Altcover" {
     It "instruments and collects" {
-        $o = "./Samples/Sample2/_Binaries/Sample2/Debug+AnyCPU/net5.0"
+        $o = "./Samples/Sample2/_Binaries/Sample2/Debug+AnyCPU/net6.0"
         $x = "./_Reports/PesterFSharpTypesDotNetRunner.xml"
-        $i = "./_Binaries/Sample2/Debug+AnyCPU/net5.0"
+        $i = "./_Binaries/Sample2/Debug+AnyCPU/net6.0"
         if (Test-Path $o) {
             Remove-Item -Force -Recurse $o
         }
@@ -56,8 +56,7 @@ Describe "Invoke-Altcover" {
         $xm = [xml](Get-Content $x)
         [string]::Join(" ", $xm.coverage.module.method.name) | Should -Be "main returnFoo returnBar testMakeUnion as_bar get_MyBar Invoke .ctor makeThing testMakeThing bytes"
         $result = [string]::Join(" ", $xm.coverage.module.method.seqpnt.visitcount)
-        $result | Should -Be "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
-                            #"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+        $result | Should -Be "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
         $w = ""
         $format = @([AltCover.Commands.Summary]::O, [AltCover.Commands.Summary]::C)
 
@@ -66,22 +65,19 @@ Describe "Invoke-Altcover" {
 
         [string]::Join(" ", $xm.coverage.module.method.name) | Should -Be "main returnFoo returnBar testMakeUnion as_bar get_MyBar Invoke .ctor makeThing testMakeThing bytes"
         $result = [string]::Join(" ", $xm.coverage.module.method.seqpnt.visitcount)
-        $result | Should -Be "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
-                            #"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+        $result | Should -Be "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
         $w | Should -Be "A total of 0 visits recorded"
 
-        $summary = Invoke-AltCover  -InformationAction Continue -Runner -RecorderDirectory $o -WorkingDirectory "./Samples/Sample2" -Executable "dotnet" -CommandLine @("test", "--no-build", "--configuration", "Debug", "--framework", "net5.0", "Sample2.fsproj")
+        $summary = Invoke-AltCover  -InformationAction Continue -Runner -RecorderDirectory $o -WorkingDirectory "./Samples/Sample2" -Executable "dotnet" -CommandLine @("test", "--no-build", "--configuration", "Debug", "--framework", "net6.0", "Sample2.fsproj")
         $xm2 = [xml](Get-Content $x)
         $result = [string]::Join(" ", $xm2.coverage.module.method.seqpnt.visitcount)
-        $result | Should -Be "0 1 1 1 0 1 0 1 0 1 1 0 0 0 0 0 0 0 0 0 0 0 2 1 0 1 0 1"
-                            #"0 1 1 1 0 1 0 1 0 1 0 0 0 0 0 0 0 2 1 0 1 0 1"
+        $result | Should -Be "0 1 1 1 0 1 0 1 0 1 1 1 0 0 0 0 0 0 0 0 0 2 1 0 1 0 1"
         $result = $summary.Replace("`r", [String]::Empty).Replace("`n", "|") 
-        $result | Should -Be "Visited Classes 4 of 7 (57.14)|Visited Methods 7 of 11 (63.64)|Visited Points 11 of 28 (39.29)|"
-                            #"Visited Classes 4 of 7 (57.14)|Visited Methods 7 of 11 (63.64)|Visited Points 10 of 23 (43.48)|"
+        $result | Should -Be "Visited Classes 4 of 7 (57.14)|Visited Methods 7 of 11 (63.64)|Visited Points 12 of 27 (44.44)|"
     }
 
     It "Fails on garbage" {
-        $o = "./Samples/Sample2/_Binaries/Sample2/Debug+AnyCPU/net5.0"
+        $o = "./Samples/Sample2/_Binaries/Sample2/Debug+AnyCPU/net6.0"
         $x = "./_Reports/PesterFSharpTypesDotNetRunner.xml"
         try 
         {
@@ -92,10 +88,10 @@ Describe "Invoke-Altcover" {
         {
           $ev | Should -Be ("--inputDirectory : Directory ./NoneSuch/xunit-dotnet/bin/Debug/netcoreapp2.0 not found" +
                             [Environment]::NewLine +"255")
-		    }
+        }
     }
 
-    It "Reports the version" {        
+    It "Reports the version" {
         $version = Invoke-AltCover -Version -InformationAction Continue 6>&1
         $version.ToString().Trim() | Should -Be ("AltCover version " + $ACV)
     }

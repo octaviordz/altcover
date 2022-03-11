@@ -22,6 +22,7 @@ type Icons<'TIcon>(toIcon: System.IO.Stream -> 'TIcon) =
   //with
   //| x -> System.InvalidOperationException(name, x) |> raise
 
+  member self.Progress = makeIcon "ProgressBar"
   member self.Report = makeIcon "RawCodeCoverageDataFile"
 
   member self.ReportDated =

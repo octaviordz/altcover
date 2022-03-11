@@ -89,9 +89,7 @@ type MainWindow() as this =
     let text = TextBlock()
     text.Text <- name
     text.Margin <- Thickness.Parse("2")
-#if !VIS_PERCENT
-    pc |> ignore
-#else
+
     let note = TextBlock()
     note.Text <- pc
     note.HorizontalAlignment <- Avalonia.Layout.HorizontalAlignment.Right
@@ -103,7 +101,7 @@ type MainWindow() as this =
       LogFont.TryParse(Persistence.readFont ()) |> snd
 
     note.FontFamily <- FontFamily(logfont.faceName)
-#endif
+
     let image = Image()
     image.Source <- icon
     image.Margin <- Thickness.Parse("2")
@@ -111,9 +109,7 @@ type MainWindow() as this =
     display.Orientation <- Avalonia.Layout.Orientation.Horizontal
     display.Children.Add tree
     display.Children.Add image
-#if VIS_PERCENT
     display.Children.Add note
-#endif
     display.Children.Add text
     display.Tag <- name
     display

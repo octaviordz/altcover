@@ -145,7 +145,6 @@ module private Gui =
     column.PackStart(icon, true)
     let cell = new Gtk.CellRendererText()
     column.PackEnd(cell, true)
-#if VIS_PERCENT
     let note = new Gtk.CellRendererText()
     note.Alignment <- Pango.Alignment.Right
 
@@ -157,18 +156,13 @@ module private Gui =
     copy.Family <- font.Family
     note.FontDesc <- copy
     column.PackEnd(note, true)
-#endif
+
     handler.classStructureTree.AppendColumn(column)
     |> ignore
 
-#if !VIS_PERCENT
-    column.AddAttribute(cell, "text", 2 * i)
-    column.AddAttribute(icon, "pixbuf", 1 + (2 * i))
-#else
     column.AddAttribute(icon, "pixbuf", (3 * i))
     column.AddAttribute(note, "text", (3 * i) + 1)
     column.AddAttribute(cell, "text", (3 * i) + 2)
-#endif
 
   let private prepareTreeView (handler: Handler) =
     handler.classStructureTree.HasTooltip <- true
@@ -183,18 +177,37 @@ module private Gui =
     seq { 0 .. (types.Length - 1) }
     |> Seq.iter (prepareTreeLine handler)
 
-#if !VIS_PERCENT
     handler.classStructureTree.Model <-
-            new TreeStore(typeof<string>, typeof<Gdk.Pixbuf>, typeof<Gdk.Pixbuf>, typeof<string>,
-                          typeof<Gdk.Pixbuf>, typeof<string>, typeof<Gdk.Pixbuf>,
-                          typeof<string>, typeof<Gdk.Pixbuf>, typeof<string>,
-                          typeof<Gdk.Pixbuf>)
+      new TreeStore(
+        typeof<Gdk.Pixbuf>,
+        typeof<string>,
+        typeof<string>,
+        typeof<Gdk.Pixbuf>,
+        typeof<string>,
+        typeof<string>,
+        typeof<Gdk.Pixbuf>,
+        typeof<string>,
+        typeof<string>,
+        typeof<Gdk.Pixbuf>,
+        typeof<string>,
+        typeof<string>
+      )
+
     handler.auxModel <-
-            new TreeStore(typeof<string>, typeof<Gdk.Pixbuf>, typeof<Gdk.Pixbuf>, typeof<string>,
-                          typeof<Gdk.Pixbuf>, typeof<string>, typeof<Gdk.Pixbuf>,
-                          typeof<string>, typeof<Gdk.Pixbuf>, typeof<string>,
-                          typeof<Gdk.Pixbuf>)
-#endif
+      new TreeStore(
+        typeof<Gdk.Pixbuf>,
+        typeof<string>,
+        typeof<string>,
+        typeof<Gdk.Pixbuf>,
+        typeof<string>,
+        typeof<string>,
+        typeof<Gdk.Pixbuf>,
+        typeof<string>,
+        typeof<string>,
+        typeof<Gdk.Pixbuf>,
+        typeof<string>,
+        typeof<string>
+      )
 
 #if !NET472
   [<AutoSerializable(false); Sealed>]
@@ -308,15 +321,10 @@ module private Gui =
         let newrow =
           context.Model.AppendValues(
             context.Row,
-#if !VIS_PERCENT
-            [| name :> obj; icon.Force() :> obj |]
-          )
-#else
             [| icon.Force() :> obj
                pc :> obj
                name :> obj |]
           )
-#endif
 
         tip
         |> Option.iter (fun text ->
@@ -363,7 +371,7 @@ module private Gui =
             table.Clear()
 
             let topRow =
-              model.AppendValues(name, (*pc,*) icon.Force()) // VIS_PERCENT
+              model.AppendValues(name, pc, icon.Force())
 
             if tip |> String.IsNullOrWhiteSpace |> not then
               let path = model.GetPath(topRow)

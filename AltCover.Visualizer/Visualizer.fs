@@ -190,11 +190,17 @@ module private Gui =
         typeof<string>,
         typeof<Gdk.Pixbuf>,
         typeof<string>,
+        typeof<string>,
+        typeof<Gdk.Pixbuf>,
+        typeof<string>,
         typeof<string>
       )
 
     handler.auxModel <-
       new TreeStore(
+        typeof<Gdk.Pixbuf>,
+        typeof<string>,
+        typeof<string>,
         typeof<Gdk.Pixbuf>,
         typeof<string>,
         typeof<string>,
@@ -371,7 +377,7 @@ module private Gui =
             table.Clear()
 
             let topRow =
-              model.AppendValues(name, pc, icon.Force())
+              model.AppendValues(icon.Force(), pc, name)
 
             if tip |> String.IsNullOrWhiteSpace |> not then
               let path = model.GetPath(topRow)

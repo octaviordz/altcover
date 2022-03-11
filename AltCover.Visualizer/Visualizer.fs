@@ -379,6 +379,9 @@ module private Gui =
             let topRow =
               model.AppendValues(icon.Force(), pc, name)
 
+            //handler.classStructureTree.RowExpanded
+            //|> Event.add(fun x -> printfn "excoll %A" x.Iter.UserData)
+
             if tip |> String.IsNullOrWhiteSpace |> not then
               let path = model.GetPath(topRow)
               table.Add(path, tip)

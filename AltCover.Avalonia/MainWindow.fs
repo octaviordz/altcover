@@ -620,6 +620,8 @@ type MainWindow() as this =
       let addNode =
         fun leaf (context: CoverageTreeContext<List<TreeViewItem>, TreeViewItem>) icon pc name (tip: string option) ->
           let newrow = makeNewRow pc leaf name icon
+          //newrow.AttachedToVisualTree
+          //    |> Event.add (fun x -> printfn "tapped %A" x.Root)
 
           (context.Row.Items :?> List<TreeViewItem>)
             .Add newrow

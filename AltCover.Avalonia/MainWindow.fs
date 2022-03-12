@@ -620,8 +620,6 @@ type MainWindow() as this =
       let addNode =
         fun leaf (context: CoverageTreeContext<List<TreeViewItem>, TreeViewItem>) icon pc name (tip: string option) ->
           let newrow = makeNewRow pc leaf name icon
-          //newrow.AttachedToVisualTree
-          //    |> Event.add (fun x -> printfn "tapped %A" x.Root)
 
           (context.Row.Items :?> List<TreeViewItem>)
             .Add newrow
@@ -683,6 +681,11 @@ type MainWindow() as this =
               { Model = model; Row = row }
           AddNode = (addNode false)
           AddLeafNode = (addNode true)
+          OnRowExpanded = (fun (row:TreeViewItem) (action:unit -> unit) ->
+                            row.Tapped
+                            |> Event.add(fun x ->
+                                                 printfn "%A %A" row x
+                                                 action()))
           Map = this.PrepareDoubleTap }
 
       Dispatcher.UIThread.Post(fun _ -> CoverageFileTree.DoSelected environment index))

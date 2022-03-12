@@ -41,6 +41,7 @@ type CoverageModelDisplay<'TModel, 'TRow, 'TIcon> =
       -> String
       -> String option
       -> CoverageTreeContext<'TModel, 'TRow>
+    OnRowExpanded : 'TRow -> (unit -> unit) -> unit
     Map: CoverageTreeContext<'TModel, 'TRow> -> XPathNavigator -> unit }
 
 module CoverageFileTree =
@@ -387,7 +388,7 @@ module CoverageFileTree =
       let newrow =
         environment.AddNode theModel (fst icon) (snd icon) name None
 
-      populateClassNode environment newrow (snd group) epoch
+      environment.OnRowExpanded newrow.Row (fun () -> populateClassNode environment newrow (snd group) epoch)
       newrow
 
     let isNested (name: string) n =
@@ -565,15 +566,20 @@ module CoverageFileTree =
           .Select("//module")
         |> Seq.cast<XPathNavigator>
 
-      assemblies
-      |> Seq.map (fun node ->
-        (node,
-         node
-           .GetAttribute("assemblyIdentity", String.Empty)
-           .Split(',')
-         |> Seq.head))
-      |> Seq.sortBy snd
-      |> Seq.iter (applyToModel model)
+      let mutable expandedOnce = false
+      environment.OnRowExpanded model.Row
+         (fun () ->
+            if not expandedOnce then
+                expandedOnce <- true
+                assemblies
+                |> Seq.map (fun node ->
+                  (node,
+                   node
+                     .GetAttribute("assemblyIdentity", String.Empty)
+                     .Split(',')
+                   |> Seq.head))
+                |> Seq.sortBy snd
+                |> Seq.iter (applyToModel model))
 
       environment.UpdateUISuccess current
 

@@ -323,7 +323,8 @@ module private Gui =
 
   let private doSelected (handler: Handler) doUpdateMRU index =
     let addNode =
-      fun (context: CoverageTreeContext<TreeStore, TreeIter>) (icon: Lazy<Gdk.Pixbuf>) pc name (tip: string option) ->
+      fun (expands : bool)
+          (context: CoverageTreeContext<TreeStore, TreeIter>) (icon: Lazy<Gdk.Pixbuf>) pc name (tip: string option) ->
         let newrow =
           context.Model.AppendValues(
             context.Row,
@@ -331,6 +332,8 @@ module private Gui =
                pc :> obj
                name :> obj |]
           )
+        if expands then
+          context.Model.AppendValues(newrow, [| icon.Force() :> obj |]) |> ignore
 
         tip
         |> Option.iter (fun text ->
@@ -378,17 +381,19 @@ module private Gui =
 
             let topRow =
               model.AppendValues(icon.Force(), pc, name)
-
-            //handler.classStructureTree.RowExpanded
-            //|> Event.add(fun x -> printfn "excoll %A" x.Iter.UserData)
+            model.AppendValues(topRow, [| icon.Force() :> obj |]) |> ignore
 
             if tip |> String.IsNullOrWhiteSpace |> not then
               let path = model.GetPath(topRow)
               table.Add(path, tip)
 
             { Model = model; Row = topRow }
-        AddNode = addNode
-        AddLeafNode = addNode
+        AddNode = addNode true
+        AddLeafNode = addNode false
+        OnRowExpanded = (fun (row:TreeIter) (action:unit -> unit) ->
+                               handler.classStructureTree.RowExpanded
+                               |> Event.add(fun x -> printfn "%A %A" row x.Iter
+                                                     if row = x.Iter then action()))
         Map = fun context xpath -> mappings.Add(context.Model.GetPath context.Row, xpath) }
 
     async { CoverageFileTree.DoSelected environment index }

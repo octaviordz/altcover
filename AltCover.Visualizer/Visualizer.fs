@@ -132,7 +132,8 @@ module private Gui =
 
     handler.aboutVisualizer.Comments <-
 #if DEBUG && !NET472
-      "[GTK3] " +
+      "[GTK3] "
+      +
 #endif
       Resource.GetResourceString("aboutVisualizer.Comments")
 
@@ -326,8 +327,7 @@ module private Gui =
 
   let private doSelected (handler: Handler) doUpdateMRU index =
     let addNode =
-      fun (expands : bool)
-          (context: CoverageTreeContext<TreeStore, TreeIter>) (icon: Lazy<Gdk.Pixbuf>) pc name (tip: string option) ->
+      fun (expands: bool) (context: CoverageTreeContext<TreeStore, TreeIter>) (icon: Lazy<Gdk.Pixbuf>) pc name (tip: string option) ->
         let newrow =
           context.Model.AppendValues(
             context.Row,
@@ -335,9 +335,12 @@ module private Gui =
                pc :> obj
                name :> obj |]
           )
+
         if expands then
           context.Model.Data.Add(newrow, New)
-          context.Model.AppendValues(newrow, [| icon.Force() :> obj |]) |> ignore
+
+          context.Model.AppendValues(newrow, [| icon.Force() :> obj |])
+          |> ignore
 
         tip
         |> Option.iter (fun text ->
@@ -385,7 +388,10 @@ module private Gui =
 
             let topRow =
               model.AppendValues(icon.Force(), pc, name)
-            model.AppendValues(topRow, [| icon.Force() :> obj |]) |> ignore
+
+            model.AppendValues(topRow, [| icon.Force() :> obj |])
+            |> ignore
+
             model.Data.Add(topRow, New)
 
             if tip |> String.IsNullOrWhiteSpace |> not then
@@ -395,8 +401,9 @@ module private Gui =
             { Model = model; Row = topRow }
         AddNode = addNode true
         AddLeafNode = addNode false
-        OnRowExpanded = (fun (row:TreeIter) (action:unit -> unit) ->
-                           handler.classStructureTree.Data.Add(row, Unexpanded action))
+        OnRowExpanded =
+          (fun (row: TreeIter) (action: unit -> unit) ->
+            handler.classStructureTree.Data.Add(row, Unexpanded action))
         Map = fun context xpath -> mappings.Add(context.Model.GetPath context.Row, xpath) }
 
     async { CoverageFileTree.DoSelected environment index }
@@ -603,24 +610,35 @@ module private Gui =
 
   let private onRowExpanded (handler: Handler) (activation: RowExpandedArgs) =
     let row = activation.Iter
+
     let clearRow () =
       let dummy = ref TreeIter.Zero
-      if handler.classStructureTree.Model.IterNthChild(dummy, row, 0)
-      then (handler.classStructureTree.Model :?> TreeStore).Remove dummy |> ignore
+
+      let model =
+        handler.classStructureTree.Model :?> TreeStore
+
+      if model.IterNthChild(dummy, row, 0) then
+        model.Remove dummy |> ignore
+
       handler.classStructureTree.Data.[row] <- Expanded
 
-    if handler.classStructureTree.Data.ContainsKey row then
-      match handler.classStructureTree.Data.[row] :?> CoverageRowState with
-      | New ->
-        clearRow ()
+    let data = handler.classStructureTree.Data
+
+    if data.ContainsKey row then
+      match data.[row] :?> CoverageRowState with
+      | New -> clearRow ()
       | Unexpanded a ->
         clearRow ()
-        a()
+        a ()
         // annoying, but the altrnative (a() then clearRow ()) messes up paths
-        handler.classStructureTree.ExpandRow(handler.classStructureTree.Model.GetPath row, false) |> ignore
+        handler.classStructureTree.ExpandRow(
+          handler.classStructureTree.Model.GetPath row,
+          false
+        )
+        |> ignore
       | _ -> ()
     else
-      clearRow()
+      clearRow ()
 
   let private onRowActivated (handler: Handler) (activation: RowActivatedArgs) =
     let hitFilter (activated: RowActivatedArgs) (path: TreePath) =

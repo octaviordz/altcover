@@ -41,7 +41,7 @@ type CoverageModelDisplay<'TModel, 'TRow, 'TIcon> =
       -> String
       -> String option
       -> CoverageTreeContext<'TModel, 'TRow>
-    OnRowExpanded : 'TRow -> (unit -> unit) -> unit
+    OnRowExpanded: 'TRow -> (unit -> unit) -> unit
     Map: CoverageTreeContext<'TModel, 'TRow> -> XPathNavigator -> unit }
 
 type CoverageRowState =
@@ -76,12 +76,12 @@ module CoverageFileTree =
     | _ -> scan s (index + 1) depth
 
   let private coverPoints (points: XPathNavigator seq) =
-    if points |> Seq.isEmpty
-    then 0
+    if points |> Seq.isEmpty then
+      0
     else
       let visited =
         points
-        |> Seq.filter (fun p -> p.GetAttribute("visitcount", String.Empty) <> "0")
+        |> Seq.filter (fun p -> p.GetAttribute("visitcount", String.Empty) != "0")
 
       (100.0 * (visited |> Seq.length |> float)
        / (points |> Seq.length |> float))
@@ -293,7 +293,8 @@ module CoverageFileTree =
                 (x.Navigator.SelectDescendants("seqpnt", String.Empty, false)
                  |> Seq.cast<XPathNavigator>
                  |> Seq.filter (fun n ->
-                   n.GetAttribute("document", String.Empty) = s.FullName)
+                   n.GetAttribute("document", String.Empty)
+                   == s.FullName)
                  |> coverPoints
                  |> coverText)
 
@@ -310,6 +311,7 @@ module CoverageFileTree =
       if special <> MethodType.Normal then
         let pc =
           keys |> Seq.map (fun x -> x.Navigator) |> pcCover
+
         let newrow =
           environment.AddNode
             theModel
@@ -393,7 +395,9 @@ module CoverageFileTree =
       let newrow =
         environment.AddNode theModel (fst icon) (snd icon) name None
 
-      environment.OnRowExpanded newrow.Row (fun () -> populateClassNode environment newrow (snd group) epoch)
+      environment.OnRowExpanded newrow.Row (fun () ->
+        populateClassNode environment newrow (snd group) epoch)
+
       newrow
 
     let isNested (name: string) n =
@@ -468,6 +472,7 @@ module CoverageFileTree =
       (group: string * seq<MethodKey>)
       =
       let name = fst group
+
       let pc =
         group
         |> snd
@@ -571,23 +576,22 @@ module CoverageFileTree =
           .Select("//module")
         |> Seq.cast<XPathNavigator>
 
-      environment.OnRowExpanded model.Row
-         (fun () ->
-                assemblies
-                |> Seq.map (fun node ->
-                  (node,
-                   node
-                     .GetAttribute("assemblyIdentity", String.Empty)
-                     .Split(',')
-                   |> Seq.head))
-                |> Seq.sortBy snd
-                |> Seq.iter (applyToModel model))
+      environment.OnRowExpanded model.Row (fun () ->
+        assemblies
+        |> Seq.map (fun node ->
+          (node,
+           node
+             .GetAttribute("assemblyIdentity", String.Empty)
+             .Split(',')
+           |> Seq.head))
+        |> Seq.sortBy snd
+        |> Seq.iter (applyToModel model))
 
       environment.UpdateUISuccess current
 
 [<assembly: SuppressMessage("Gendarme.Rules.Globalization",
                             "PreferStringComparisonOverrideRule",
                             Scope = "member",  // MethodDefinition
-                            Target = "AltCover.CoverageFileTree/step@118::Invoke(System.String,System.Int32)",
+                            Target = "AltCover.CoverageFileTree/step@126::Invoke(System.String,System.Int32)",
                             Justification = "Replace overload not in netstandard2.0")>]
 ()

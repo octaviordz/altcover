@@ -339,7 +339,8 @@ type MainWindow() as this =
               Environment.NewLine,
               textLines
               |> Seq.mapi (fun i _ -> sprintf "%6d " (1 + i))
-            ) + Environment.NewLine
+            )
+            + Environment.NewLine
 
           let sample = textLines |> Seq.head
           let depth = sample.Height * float (line - 1)
@@ -554,19 +555,22 @@ type MainWindow() as this =
       if not leaf then
         l.Add <| TreeViewItem()
         row.Tag <- New
-      else row.Tag <- Expanded
+      else
+        row.Tag <- Expanded
 
       row.Items <- l
+
       row.Tapped
-      |> Event.add(fun x -> match row.Tag :?> CoverageRowState with
-                            | New ->
-                              row.Tag <- Expanded
-                              l.RemoveAt(0)
-                            | Unexpanded a ->
-                              row.Tag <- Expanded
-                              a()
-                              l.RemoveAt(0)
-                            | _ -> ())
+      |> Event.add (fun x ->
+        match row.Tag :?> CoverageRowState with
+        | New ->
+          row.Tag <- Expanded
+          l.RemoveAt(0)
+        | Unexpanded a ->
+          row.Tag <- Expanded
+          a ()
+          l.RemoveAt(0)
+        | _ -> ())
 
       row.HorizontalAlignment <- Avalonia.Layout.HorizontalAlignment.Left
 
@@ -662,8 +666,9 @@ type MainWindow() as this =
               { Model = model; Row = row }
           AddNode = (addNode false)
           AddLeafNode = (addNode true)
-          OnRowExpanded = (fun (row:TreeViewItem) (action:unit -> unit) ->
-                                row.Tag <- Unexpanded action)
+          OnRowExpanded =
+            (fun (row: TreeViewItem) (action: unit -> unit) ->
+              row.Tag <- Unexpanded action)
           Map = this.PrepareDoubleTap }
 
       Dispatcher.UIThread.Post(fun _ -> CoverageFileTree.DoSelected environment index))
@@ -756,6 +761,6 @@ type MainWindow() as this =
 [<assembly: SuppressMessage("Gendarme.Rules.Correctness",
                             "EnsureLocalDisposalRule",
                             Scope = "member",
-                            Target = "<StartupCode$AltCover-Visualizer>.$MainWindow/Pipe #1 input at line 531@532::Invoke(Microsoft.FSharp.Core.Unit)",
+                            Target = "<StartupCode$AltCover-Visualizer>.$MainWindow/Pipe #1 input at line 516@517::Invoke(Microsoft.FSharp.Core.Unit)",
                             Justification = "Local of type 'Task`1' is not disposed of. Hmm.")>]
 ()

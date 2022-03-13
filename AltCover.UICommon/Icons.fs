@@ -23,7 +23,9 @@ type Icons<'TIcon>(toIcon: System.IO.Stream -> 'TIcon) =
   //| x -> System.InvalidOperationException(name, x) |> raise
 
   member self.Progress = makeIcon "ProgressBar"
-  member self.Report = makeIcon "RawCodeCoverageDataFile"
+
+  member self.Report =
+    makeIcon "RawCodeCoverageDataFile"
 
   member self.ReportDated =
     makeIcon "RawCodeCoverageDataFileStale"
@@ -34,8 +36,7 @@ type Icons<'TIcon>(toIcon: System.IO.Stream -> 'TIcon) =
   member self.Assembly = makeIcon "Assembly"
   member self.Event = makeIcon "Event"
 
-  member self.Namespace =
-    makeIcon "Namespace"
+  member self.Namespace = makeIcon "Namespace"
 
   member self.Module = makeIcon "Module"
   member self.Effect = makeIcon "Effect"
@@ -55,16 +56,14 @@ type Icons<'TIcon>(toIcon: System.IO.Stream -> 'TIcon) =
   member self.Branched =
     makeIcon "BranchFork_grn"
 
-  member self.Branch =
-    makeIcon "BranchFork_ylw"
+  member self.Branch = makeIcon "BranchFork_ylw"
 
   member self.RedBranch =
     makeIcon "BranchFork_red"
 
   member self.Blank = makeIcon "Blank"
 
-  member self.TreeExpand =
-    makeIcon "ExpandRight"
+  member self.TreeExpand = makeIcon "ExpandRight"
 
   member self.TreeCollapse =
     makeIcon "ExpandDown"
@@ -75,17 +74,14 @@ type Icons<'TIcon>(toIcon: System.IO.Stream -> 'TIcon) =
   member self.SourceDated =
     makeIcon "TextFileStale"
 
-  member self.SourceLink =
-    makeIcon "TextFileWeb"
+  member self.SourceLink = makeIcon "TextFileWeb"
 
-  member self.NoSource =
-    makeIcon "MissingFile"
+  member self.NoSource = makeIcon "MissingFile"
 
   member self.MRUInactive =
     makeIcon "ExpandDown_lightGrey"
 
-  member self.RefreshActive =
-    makeIcon "Refresh"
+  member self.RefreshActive = makeIcon "Refresh"
 
   member self.Refresh =
     makeIcon "Refresh_greyThin"
@@ -95,8 +91,7 @@ type Icons<'TIcon>(toIcon: System.IO.Stream -> 'TIcon) =
 
   member self.Warn = makeIcon "StatusWarning_32"
 
-  member self.Error =
-    makeIcon "StatusError_32"
+  member self.Error = makeIcon "StatusError_32"
 
   member self.Open = makeIcon "OpenFile"
   member self.Font = makeIcon "Font"

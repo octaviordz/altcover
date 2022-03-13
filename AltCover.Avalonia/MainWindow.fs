@@ -338,10 +338,8 @@ type MainWindow() as this =
             String.Join(
               Environment.NewLine,
               textLines
-              // Font limitation or Avalonia limitation?
-              // character \u2442 just shows as a box.
               |> Seq.mapi (fun i _ -> sprintf "%6d " (1 + i))
-            )
+            ) + Environment.NewLine
 
           let sample = textLines |> Seq.head
           let depth = sample.Height * float (line - 1)

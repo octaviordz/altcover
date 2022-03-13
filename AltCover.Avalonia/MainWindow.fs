@@ -77,15 +77,6 @@ type MainWindow() as this =
     SolidColorBrush.Parse "#87CEEB" // "#F5F5F5" // Sky Blue on White Smoke
 
   let makeTreeNode pc leaf name icon =
-    let tree = Image()
-
-    tree.Source <-
-      if leaf then
-        icons.Blank.Force()
-      else
-        icons.TreeExpand.Force()
-
-    tree.Margin <- Thickness.Parse("2")
     let text = TextBlock()
     text.Text <- name
     text.Margin <- Thickness.Parse("2")
@@ -107,7 +98,6 @@ type MainWindow() as this =
     image.Margin <- Thickness.Parse("2")
     let display = StackPanel()
     display.Orientation <- Avalonia.Layout.Orientation.Horizontal
-    display.Children.Add tree
     display.Children.Add image
     display.Children.Add note
     display.Children.Add text
@@ -561,6 +551,25 @@ type MainWindow() as this =
 
     let makeNewRow note leaf name (anIcon: Lazy<Bitmap>) =
       let row = TreeViewItem()
+      let l = List<TreeViewItem>()
+
+      if not leaf then
+        l.Add <| TreeViewItem()
+        row.Tag <- New
+      else row.Tag <- Expanded
+
+      row.Items <- l
+      row.Tapped
+      |> Event.add(fun x -> match row.Tag :?> CoverageRowState with
+                            | New ->
+                              row.Tag <- Expanded
+                              l.RemoveAt(0)
+                            | Unexpanded a ->
+                              row.Tag <- Expanded
+                              a()
+                              l.RemoveAt(0)
+                            | _ -> ())
+
       row.HorizontalAlignment <- Avalonia.Layout.HorizontalAlignment.Left
 
       row.LayoutUpdated
@@ -578,32 +587,6 @@ type MainWindow() as this =
         row.Items.OfType<TreeViewItem>()
         |> Seq.iter remargin)
 
-      row.Tapped
-      |> Event.add (fun evt ->
-        row.IsExpanded <- not row.IsExpanded
-
-        if not leaf then
-          let items =
-            (row.Header :?> StackPanel).Children
-
-          items.RemoveAt(0)
-          let mark = Image()
-
-          mark.Source <-
-            if row.Items.OfType<Object>().Any() then
-              if row.IsExpanded then
-                icons.TreeCollapse.Force()
-              else
-                icons.TreeExpand.Force()
-            else
-              icons.Blank.Force()
-
-          mark.Margin <- Thickness.Parse("2")
-          items.Insert(0, mark)
-
-        evt.Handled <- true)
-
-      row.Items <- List<TreeViewItem>()
       row.Header <- makeTreeNode note leaf name <| anIcon.Force()
       row
 
@@ -682,10 +665,7 @@ type MainWindow() as this =
           AddNode = (addNode false)
           AddLeafNode = (addNode true)
           OnRowExpanded = (fun (row:TreeViewItem) (action:unit -> unit) ->
-                            row.Tapped
-                            |> Event.add(fun x ->
-                                                 printfn "%A %A" row x
-                                                 action()))
+                                row.Tag <- Unexpanded action)
           Map = this.PrepareDoubleTap }
 
       Dispatcher.UIThread.Post(fun _ -> CoverageFileTree.DoSelected environment index))

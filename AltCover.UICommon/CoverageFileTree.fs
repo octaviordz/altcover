@@ -44,6 +44,11 @@ type CoverageModelDisplay<'TModel, 'TRow, 'TIcon> =
     OnRowExpanded : 'TRow -> (unit -> unit) -> unit
     Map: CoverageTreeContext<'TModel, 'TRow> -> XPathNavigator -> unit }
 
+type CoverageRowState =
+  | New
+  | Unexpanded of (unit -> unit)
+  | Expanded
+
 module CoverageFileTree =
 
   [<AutoSerializable(false)>]
@@ -566,11 +571,8 @@ module CoverageFileTree =
           .Select("//module")
         |> Seq.cast<XPathNavigator>
 
-      let mutable expandedOnce = false
       environment.OnRowExpanded model.Row
          (fun () ->
-            if not expandedOnce then
-                expandedOnce <- true
                 assemblies
                 |> Seq.map (fun node ->
                   (node,

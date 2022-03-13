@@ -131,6 +131,9 @@ module private Gui =
       )
 
     handler.aboutVisualizer.Comments <-
+#if DEBUG && !NET472
+      "[GTK3] " +
+#endif
       Resource.GetResourceString("aboutVisualizer.Comments")
 
     handler.aboutVisualizer.WebsiteLabel <-
